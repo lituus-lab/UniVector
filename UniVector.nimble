@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-# UniVector — 2D vector-graphics engine for the lituus-lab Uni* family.
+# UniVector — vector-graphics engine for the lituus-lab Uni* family.
 
 version       = "1.0.0"
 author        = "lituus-lab"
-description   = "2D vector-graphics engine for the lituus-lab Uni* family (Nim + C-ABI + Python)"
+description   = "Extensible vector-graphics engine for the lituus-lab Uni* family (Nim + C-ABI + Python)"
 license       = "Apache-2.0"
 srcDir        = "src"
 
@@ -49,18 +49,10 @@ task testRelease, "Nim tests (release, contracts compiled away)":
   exec "nim c -r -d:release --path:src -o:build/test_svg_rel tests/test_svg.nim"
 
 task testCi, "Nim tests (CI subset, debug)":
-  exec "nim c -r --path:src -o:build/test_version tests/test_version.nim"
-  exec "nim c -r --path:src -o:build/test_path tests/test_path.nim"
-  exec "nim c -r --path:src -o:build/test_flatten tests/test_flatten.nim"
-  exec "nim c -r --path:src -o:build/test_raster tests/test_raster.nim"
-  exec "nim c -r --path:src -o:build/test_svg tests/test_svg.nim"
+  exec "nimble test"
 
 task testCiRelease, "Nim tests (CI subset, release)":
-  exec "nim c -r -d:release --path:src -o:build/test_version_rel tests/test_version.nim"
-  exec "nim c -r -d:release --path:src -o:build/test_path_rel tests/test_path.nim"
-  exec "nim c -r -d:release --path:src -o:build/test_flatten_rel tests/test_flatten.nim"
-  exec "nim c -r -d:release --path:src -o:build/test_raster_rel tests/test_raster.nim"
-  exec "nim c -r -d:release --path:src -o:build/test_svg_rel tests/test_svg.nim"
+  exec "nimble testRelease"
 
 task testAll, "debug + release + C ABI":
   exec "nimble test"
@@ -102,6 +94,7 @@ task clibMsvc, "C static library, MSVC ABI (Windows Python extension)":
 
 # Nim's MinGW toolchain names it mingw32-make.
 let makeExe = if findExe("mingw32-make").len > 0: "mingw32-make" else: "make"
+let pythonExe = if defined(windows): "python" else: "python3"
 
 # `make -C`, not `cd dir && make`: nimble's exec runs no shell on Windows.
 task ctest, "C ABI tests":
@@ -119,7 +112,12 @@ task cexample, "C demo (print-only consumer of the uv_* ABI)":
   exec makeExe & " -C examples/c"
 
 task pyDeps, "Install Python build deps (setuptools, Cython, pytest) if missing":
-  exec "python3 -m pip install --break-system-packages --quiet setuptools wheel \"Cython>=3.0.0\" pytest"
+  let pipHelp = gorgeEx(pythonExe & " -m pip install --help").output
+  let systemFlag =
+    if pipHelp.contains("--break-system-packages"): " --break-system-packages"
+    else: ""
+  exec pythonExe & " -m pip install" & systemFlag &
+       " --quiet setuptools wheel \"Cython>=3.0.0\" pytest"
 
 # The extension links the vcc static lib on Windows, the shared lib elsewhere.
 task pyLib, "Build the library the Python extension links against":
@@ -134,54 +132,48 @@ task buildCython, "Cython extension in-place":
   # nimscript `cd` (lib/system/nimscript.nim) changes the VM cwd for the next
   # exec without a shell, so the task works under nimble's no-shell exec on Windows.
   cd "py"
-  exec "python3 setup.py build_ext --inplace"
+  exec pythonExe & " setup.py build_ext --inplace"
   cd ".."
 
 task pyTest, "Cython extension + pytest":
   exec "nimble buildCython"
   cd "py"
-  exec "python3 -m pytest -q"
+  exec pythonExe & " -m pytest -q"
   cd ".."
 
 task pyWheel, "wheel":
   exec "nimble pyLib"
   exec "nimble pyDeps"
   cd "py"
-  exec "python3 setup.py bdist_wheel"
+  exec pythonExe & " setup.py bdist_wheel"
   cd ".."
 
 task pySdist, "Python source distribution with vendored Nim source":
   exec "nimble pyDeps"
   cd "py"
-  exec "python3 setup.py sdist"
+  exec pythonExe & " setup.py sdist"
   cd ".."
 
 task coverage, "LCOV + HTML coverage report for the Nim sources (needs lcov)":
   # gcov and lcov driven directly, no coco. Linux and macOS only.
   # --debugger:native attributes lines to the .nim sources, not the generated C.
-  # --include keeps stdlib out of the capture, where lcov 2.x aborts on Nim's
-  # codegen. Together they leave nothing to suppress: no --ignore-errors here,
-  # so a real problem still fails the build.
+  # --include keeps stdlib out. Nim 2.2 can still emit counters for a synthetic
+  # line past EOF and empty counters for imported platform modules; ignore only
+  # those two lcov mapping categories, never source/read/write errors.
   let cache = "build/covcache"
   rmDir cache
   rmDir "coverage"
   rmFile "lcov.info"
-  # Each coverage binary gets its own nimcache subdir. Sharing one nimcache
-  # across the differently-instrumented `nim c` builds re-instruments the
-  # shared stdlib modules with a different gcov counter layout each time, so
-  # when the binaries run they write conflicting `.gcda` to the same paths and
-  # lcov aborts on `cannot merge previous GCDA file: mismatched number of
-  # counters`. `lcov --capture --directory build/covcache` recurses into the
-  # subdirs, so aggregation is unchanged.
-  const bins = [("version", "test_version"), ("path", "test_path"),
-                ("flatten", "test_flatten"), ("raster", "test_raster"),
-                ("svg", "test_svg")]
-  for (name, src) in bins:
-    exec "nim c --path:src --nimcache:" & cache & "/" & name &
-         " --debugger:native --passC:--coverage --passL:--coverage" &
-         " -o:build/test_cov_" & name & " tests/" & src & ".nim"
-    exec "./build/test_cov_" & name
+  # One executable keeps each generated module and its counters in one graph.
+  # Merging separately compiled modules is ambiguous because their initializers
+  # can receive different source lines in each executable.
+  exec "nim c --path:src --nimcache:" & cache &
+       " --debugger:native --passC:--coverage --passL:--coverage" &
+       " -o:build/test_coverage tests/test_coverage.nim"
+  exec "./build/test_coverage"
   exec "lcov --capture --directory " & cache & " --base-directory ." &
-       " --include \"*/src/UniVector/*\" --output-file lcov.info --quiet"
-  exec "genhtml lcov.info --output-directory coverage --legend --quiet"
+       " --include \"*/src/UniVector/*\" --output-file lcov.info --quiet" &
+       " --ignore-errors gcov,gcov"
+  exec "genhtml lcov.info --output-directory coverage --legend --quiet" &
+       " --ignore-errors range,range"
   exec "lcov --summary lcov.info"

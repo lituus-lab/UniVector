@@ -1,0 +1,62 @@
+# build artifacts
+build/
+# bin/ holds the compiled CLI (univector) plus its Nim source. Ignore the
+# binary output, track the source. git cannot re-include a file under an
+# ignored directory, so ignore `/bin/*` (not `/bin/`) then negate *.nim.
+/bin/*
+!/bin/*.nim
+libUniVector.so
+libUniVector.so.*
+libUniVector.dylib
+libUniVector.a
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.so.*
+*.dylib
+*.a
+*.lib
+
+# coverage
+coverage/
+lcov.info
+
+# nim cache
+nimcache/
+rnimcache/
+dnimcache/
+
+# docs output
+pages/
+docs/
+*.html
+nimdoc.out.css
+
+# C test and example binaries
+/tests/c/test_univector
+/examples/c/demo
+
+# python binding artifacts (sources tracked; generated + bundled lib not)
+py/univector/_core.c
+py/univector/*.so
+py/univector/*.pyd
+py/univector/libUniVector.so
+py/univector/libUniVector.dylib
+py/univector/libUniVector.dll
+py/dist/
+py/build/
+py/*.egg-info/
+py/_nimsrc/
+py/**/__pycache__/
+py/.pytest_cache/
+
+# os / editor
+.DS_Store
+*~
+.*.swp
+*.dSYM
+
+*.log
+*.core
