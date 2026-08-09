@@ -6,6 +6,11 @@
 It can parse or construct SVG-style paths, inspect and flatten their geometry,
 render solid fills into RGBA8 images, and produce SVG or PNG bytes.
 
+The SVG support is deliberately path-focused: `Path.parse_d()` reads path data,
+and `Path.to_svg()` writes a minimal document containing one solid-filled path.
+It does not parse arbitrary SVG documents or preserve SVG scene structure,
+styles, transforms, strokes, gradients, text, or external resources.
+
 ## Install
 
 ```bash
@@ -62,8 +67,8 @@ print(path.flatten(0.25)) # [((x0, y0), (x1, y1)), ...]
 print(path.bounds(0.25))  # (x, y, width, height)
 ```
 
-The tolerance is the maximum accepted curve-to-chord deviation. A smaller
-value produces more segments and generally smoother edges at a higher cost.
+The tolerance is the subdivision threshold used against each curve span. A
+smaller value produces more segments and generally smoother edges at a higher cost.
 Passing `0.0` selects `FLATTEN_TOLERANCE`.
 
 ## Geometry helpers
@@ -93,7 +98,8 @@ parameters.
 - Command metadata: `is_relative`, `parameter_count`, and `PATH_*` constants.
 - Rendering constants: `WINDING_NON_ZERO`, `WINDING_EVEN_ODD`,
   `BLEND_NORMAL`, `BLEND_OVERWRITE`, `GEOMETRIC_EPSILON`,
-  `FLATTEN_TOLERANCE`, `MAX_FLATTEN_DEPTH`, and `SUPERSAMPLE`.
+  `FLATTEN_TOLERANCE`, `MAX_FLATTEN_DEPTH`, `MAX_FLATTEN_SEGMENTS`, and
+  `SUPERSAMPLE`.
 - Runtime: `version`, `abi_version`, and `strerror`.
 
 ## Errors and lifetime
