@@ -9,7 +9,7 @@ name = "univector"
 version = "1.0.0"
 description = "Python binding for the extensible UniVector vector-graphics engine"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "Apache-2.0"
 authors = [{ name = "lbartoletti" }]
 keywords = ["vector-graphics", "svg", "rasterization", "bezier", "graphics"]
@@ -17,7 +17,6 @@ classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -34,7 +33,7 @@ Repository = "https://github.com/lituus-lab/UniVector"
 Issues = "https://github.com/lituus-lab/UniVector/issues"
 
 [project.optional-dependencies]
-test = ["pytest>=7"]
+test = ["pytest>=9.1.1"]
 
 [tool.setuptools]
 packages = ["univector"]
