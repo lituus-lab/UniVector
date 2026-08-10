@@ -17,7 +17,7 @@ styles, transforms, strokes, gradients, text, or external resources.
 python -m pip install univector
 ```
 
-Wheels are built for CPython 3.9–3.14 on Linux, macOS, and Windows. A source
+Wheels are built for CPython 3.10–3.14 on Linux, macOS, and Windows. A source
 installation needs Nim and Nimble on `PATH`, a supported C compiler, and the
 platform's zlib development package because it compiles the vendored Nim
 engine and its PNG support:
