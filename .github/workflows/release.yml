@@ -58,7 +58,7 @@ jobs:
           cp libUniVector.* "$dir/"
           cp LICENSE NOTICE "$dir/"
           tar czf "$dir.tar.gz" "$dir"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cabi-${{ matrix.os }}
           path: '*.tar.gz'
@@ -96,7 +96,7 @@ jobs:
             macOS)   pip install delocate   && delocate-wheel py/dist/*.whl -w dist/ ;;
             Windows) pip install delvewheel && delvewheel repair py/dist/*.whl -w dist/ ;;
           esac
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheel-${{ matrix.os }}-py${{ matrix.python-version }}
           path: dist/*.whl
@@ -113,7 +113,7 @@ jobs:
           python-version: '3.12'
       - run: pip install -U setuptools wheel Cython
       - run: cd py && python setup.py sdist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sdist
           path: py/dist/*.tar.gz
