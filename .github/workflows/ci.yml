@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { fetch-depth: 0, persist-credentials: false }
       - name: Every commit must carry a Signed-off-by trailer
         run: |
@@ -42,7 +42,7 @@ jobs:
     name: SPDX headers
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { persist-credentials: false }
       # Mirrors tools/hooks/spdx_check.sh: every tracked Nim/C/Python source must
       # carry an SPDX-License-Identifier header in its first 5 lines.
@@ -57,7 +57,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { persist-credentials: false }
       - uses: jiro4989/setup-nim-action@v2
         with:
@@ -75,7 +75,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { persist-credentials: false }
       - uses: jiro4989/setup-nim-action@v2
         with:
@@ -115,7 +115,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { persist-credentials: false }
       - uses: jiro4989/setup-nim-action@v2
         with:
@@ -165,7 +165,7 @@ jobs:
     steps:
       # No setup-nim-action on purpose: proves the published header and lib work
       # on a machine without Nim, using only the test source from the checkout.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { persist-credentials: false }
       - uses: actions/download-artifact@v4
         with:
@@ -215,7 +215,7 @@ jobs:
     steps:
       # Neither Nim nor libUniVector exists here: whatever the extension needs
       # at runtime must have travelled inside the wheel.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { persist-credentials: false }
       - uses: actions/setup-python@v5
         with:
@@ -243,7 +243,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { persist-credentials: false }
       - uses: jiro4989/setup-nim-action@v2
         with:
@@ -255,7 +255,7 @@ jobs:
     name: Docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { persist-credentials: false }
       - uses: jiro4989/setup-nim-action@v2
         with:
@@ -301,7 +301,7 @@ jobs:
     # suppresses no error, so 1.x and 2.x agree.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { persist-credentials: false }
       - uses: jiro4989/setup-nim-action@v2
         with:
