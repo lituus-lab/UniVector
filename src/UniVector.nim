@@ -8,7 +8,6 @@
 ## (`svg`). The `uv_*` C ABI (`c_api`) exposes this surface to C and Python.
 ## The public surface is paths, curve flattening, solid-fill rasterization,
 ## and SVG output.
-import std/[os, strutils]
 import UniVector/common
 import UniVector/path
 import UniVector/flatten
@@ -20,12 +19,5 @@ export flatten
 export raster
 export svg
 
-func manifestVersion(text: string): string {.compileTime.} =
-  for line in text.splitLines:
-    let fields = line.split('=', 1)
-    if fields.len == 2 and fields[0].strip == "version":
-      return fields[1].strip.strip(chars = {'"'})
-  raise newException(ValueError, "UniVector.nimble has no version")
+const UniVectorVersion* = "1.0.0"
 
-const UniVectorVersion* = manifestVersion(staticRead(
-  currentSourcePath.parentDir.parentDir / "UniVector.nimble"))
