@@ -88,6 +88,31 @@ int main(void) {
   assert(stroked != NULL);
   assert(uv_path_command_count(stroked) > 0);
   uv_path_free(stroked);
+  float dash_pattern[] = {1.0f, 1.0f};
+  uv_path dashed = uv_prepared_path_stroke_dashed(
+      prepared, 2.0f, UV_CAP_BUTT, UV_JOIN_MITER,
+      UNIVECTOR_DEFAULT_MITER_LIMIT, dash_pattern, 2, 0.0f);
+  assert(dashed != NULL);
+  assert(uv_path_command_count(dashed) > 0);
+  uv_path_free(dashed);
+  assert(uv_prepared_path_stroke_dashed(
+      prepared, 2.0f, UV_CAP_BUTT, UV_JOIN_MITER,
+      UNIVECTOR_DEFAULT_MITER_LIMIT, NULL, 1, 0.0f) == NULL);
+  uv_vec2 marker_points[] = {{2.0f, 2.0f}, {6.0f, 6.0f}};
+  float marker_sizes[] = {2.0f, 4.0f};
+  uv_path marker = uv_marker_path(UV_MARKER_DIAMOND, marker_points[0], 2.0f);
+  assert(marker != NULL);
+  uv_path_free(marker);
+  uv_path markers = uv_markers_path(
+      UV_MARKER_SQUARE, marker_points, 2, 2.0f);
+  assert(markers != NULL);
+  assert(uv_path_command_count(markers) == 10);
+  uv_path_free(markers);
+  uv_path sized_markers = uv_markers_path_sized(
+      UV_MARKER_CIRCLE, marker_points, marker_sizes, 2);
+  assert(sized_markers != NULL);
+  uv_path_free(sized_markers);
+  assert(uv_marker_path(999, marker_points[0], 2.0f) == NULL);
   uv_mesh mesh = uv_prepared_path_tessellate_fill(
       prepared, UV_WINDING_NON_ZERO);
   assert(mesh != NULL);
@@ -106,6 +131,12 @@ int main(void) {
   assert(stroke_mesh != NULL);
   assert(uv_mesh_index_count(stroke_mesh) > 0);
   uv_mesh_free(stroke_mesh);
+  uv_mesh dashed_stroke_mesh = uv_prepared_path_tessellate_stroke_dashed(
+      prepared, 2.0f, UV_CAP_BUTT, UV_JOIN_MITER,
+      UNIVECTOR_DEFAULT_MITER_LIMIT, dash_pattern, 2, 0.0f);
+  assert(dashed_stroke_mesh != NULL);
+  assert(uv_mesh_index_count(dashed_stroke_mesh) > 0);
+  uv_mesh_free(dashed_stroke_mesh);
   uv_prepared_path_free(prepared);
 
   uv_vec2 midpoint = {0};

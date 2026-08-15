@@ -84,6 +84,15 @@ typedef enum {
 } uv_line_join;
 
 typedef enum {
+  UV_MARKER_CIRCLE = 0,
+  UV_MARKER_SQUARE = 1,
+  UV_MARKER_TRIANGLE = 2,
+  UV_MARKER_DIAMOND = 3,
+  UV_MARKER_PLUS = 4,
+  UV_MARKER_CROSS = 5
+} uv_marker_shape;
+
+typedef enum {
   UV_PATH_CLOSE = 0,
   UV_PATH_MOVE,
   UV_PATH_LINE,
@@ -128,6 +137,8 @@ typedef struct {
 #define UNIVECTOR_SUPERSAMPLE 4
 #define UNIVECTOR_GEOMETRIC_EPSILON 0.00031415927f
 #define UNIVECTOR_DEFAULT_MITER_LIMIT 4.0f
+#define UNIVECTOR_MAX_DASH_PATTERN_ELEMENTS 1024
+#define UNIVECTOR_MAX_MARKER_COUNT 65536
 #define UNIVECTOR_MAX_MESH_VERTICES 4194304
 #define UNIVECTOR_MAX_MESH_INDICES 6291456
 
@@ -213,11 +224,24 @@ void    uv_prepared_path_free(uv_prepared_path h);
  * allocation failure. The returned path is released with uv_path_free. */
 uv_path uv_prepared_path_stroke(uv_prepared_path h, float width, int cap,
                                 int join, float miter_limit);
+/* Additive dashed variant. NULL dashes is valid only when dash_count is zero. */
+uv_path uv_prepared_path_stroke_dashed(
+    uv_prepared_path h, float width, int cap, int join, float miter_limit,
+    const float* dashes, size_t dash_count, float dash_offset);
+/* Filled marker paths; size is the full width/height. Empty batches are valid. */
+uv_path uv_marker_path(int shape, uv_vec2 center, float size);
+uv_path uv_markers_path(int shape, const uv_vec2* points, size_t count,
+                        float size);
+uv_path uv_markers_path_sized(int shape, const uv_vec2* points,
+                              const float* sizes, size_t count);
 
 /* --- mesh --- */
 uv_mesh uv_prepared_path_tessellate_fill(uv_prepared_path h, int winding);
 uv_mesh uv_prepared_path_tessellate_stroke(
     uv_prepared_path h, float width, int cap, int join, float miter_limit);
+uv_mesh uv_prepared_path_tessellate_stroke_dashed(
+    uv_prepared_path h, float width, int cap, int join, float miter_limit,
+    const float* dashes, size_t dash_count, float dash_offset);
 size_t  uv_mesh_vertex_count(uv_mesh h);
 size_t  uv_mesh_index_count(uv_mesh h);
 int     uv_mesh_vertex_get(uv_mesh h, size_t index,
