@@ -62,3 +62,10 @@ proc segments*(path: PreparedPath): seq[Segment] =
   result = newSeq[Segment](path.len)
   for i in 0 ..< path.len:
     result[i] = path.segmentsData[i]
+
+func segmentView*(path: PreparedPath): lent seq[Segment] {.inline.} =
+  ## Borrow the contiguous segment storage without allocating a snapshot.
+  ##
+  ## The returned view cannot be modified or retained beyond `path`'s
+  ## lifetime. Use `segments` when an independent, mutable snapshot is needed.
+  path.segmentsData
