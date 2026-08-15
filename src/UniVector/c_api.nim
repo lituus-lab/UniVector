@@ -726,6 +726,19 @@ proc uv_fill_path(img: pointer; path: pointer; color: pointer;
   except CatchableError, Defect:
     UV_ERR_FORMAT
 
+proc uv_fill_prepared_path(img: pointer; path: pointer; color: pointer;
+    winding, blend: cint): cint =
+  if img == nil or path == nil or color == nil or
+      winding notin [UV_WINDING_NON_ZERO, UV_WINDING_EVEN_ODD] or
+      blend < cint(low(BlendMode).ord) or blend > cint(high(BlendMode).ord):
+    return UV_ERR_FORMAT
+  try:
+    imgOf(img).img.fillPreparedPath(preparedPathOf(path).path,
+        colorOf(color).color, WindingRule(winding), BlendMode(blend))
+    UV_OK
+  except CatchableError, Defect:
+    UV_ERR_FORMAT
+
 # -------------------------------- svg ---------------------------------------
 
 proc uv_path_to_svg(path: pointer; color: pointer; width, height: cint;

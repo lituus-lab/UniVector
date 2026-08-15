@@ -256,6 +256,9 @@ void     uv_color_free(uv_color h);
  * flattening tolerance. */
 int      uv_fill_path(uv_image img, uv_path path, uv_color color,
                       int winding, float tol, int blend);
+/* Fill cached geometry without flattening or recomputing its bounds. */
+int      uv_fill_prepared_path(uv_image img, uv_prepared_path path,
+                               uv_color color, int winding, int blend);
 
 /* --- svg --- */
 /* Wrap the path's `d` string in an <svg> document with `color` and the canvas

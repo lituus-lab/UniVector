@@ -174,6 +174,22 @@ NonZero and EvenOdd winding are both supported, including nested contours.
 The immutable snapshots returned by Nim, C, and Python can be cached or copied
 directly into backend-owned buffers.
 
+The CPU rasterizer can consume the same snapshot without flattening or
+recomputing bounds:
+"""
+
+nbCode:
+  import UniColor
+  import UniImage/core as uimg
+  var preparedSurface = uimg.newImage[uint8](16, 12, uimg.csRgba)
+  preparedSurface.fillPreparedPath(meshPath.preparePath(),
+      parseColor("#3366cc").get)
+  doAssert preparedSurface.data[(2 * 16 + 2) * 4 + 3] > 0
+
+nbText: """
+Use this path for repeated frames. In C it is `uv_fill_prepared_path`; in
+Python it is `Image.fill_prepared()`.
+
 ## Filling: crossings and winding
 
 For each sampled scanline, UniVector finds where path edges cross it and sorts

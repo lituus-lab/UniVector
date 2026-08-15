@@ -13,6 +13,7 @@ import contracts
 import UniVector/common
 import UniVector/path
 import UniVector/flatten
+import UniVector/prepared
 import UniImage/core as uimg
 import UniColor
 
@@ -73,6 +74,90 @@ proc blendOverwrite(img: var uimg.Image[uint8]; idx: int;
   img.data[idx + 2] = uint8(sb * 255'f32 + 0.5'f32)
   img.data[idx + 3] = uint8(a * 255'f32 + 0.5'f32)
 
+func geometryLen(segments: seq[Segment]): int {.inline.} = segments.len
+func geometryLen(path: PreparedPath): int {.inline.} = path.len
+func geometryAt(segments: seq[Segment]; index: int): Segment {.inline.} =
+  segments[index]
+func geometryAt(path: PreparedPath; index: int): Segment {.inline.} =
+  path.segment(index)
+func geometryBounds(segments: seq[Segment]): Rect {.inline.} =
+  segments.computeBounds()
+func geometryBounds(path: PreparedPath): Rect {.inline.} = path.bounds
+
+proc fillGeometry[Geometry](img: var uimg.Image[uint8]; geometry: Geometry;
+    color: Color; windingRule: WindingRule; blendMode: BlendMode) =
+  if geometry.geometryLen == 0: return
+  let
+    width = img.width
+    height = img.height
+    bounds = geometry.geometryBounds
+    minY = bounds.y
+    maxY = bounds.y + bounds.h
+  if maxY < 0'f32 or minY > float32(height): return
+  let
+    y0 = int(floor(max(minY, 0'f32)))
+    y1 = min(height - 1, int(ceil(min(maxY, float32(height)))))
+  if y0 > y1: return
+  let converted = color.gamutMap(tagSrgb)
+  if converted.isErr:
+    raise newException(ValueError, "fill: color cannot be converted to sRGB")
+  let c = converted.get
+  let
+    sr = clamp(c.comp(0), 0'f32, 1'f32)
+    sg = clamp(c.comp(1), 0'f32, 1'f32)
+    sb = clamp(c.comp(2), 0'f32, 1'f32)
+    sa = clamp(c.alpha, 0'f32, 1'f32)
+  if sa <= 0'f32: return
+  let invSup = 1'f32 / float32(Supersample)
+  var
+    coverage = newSeq[float32](width)
+    crossings: seq[Crossing] = @[]
+  for y in y0 .. y1:
+    for p in 0 ..< width: coverage[p] = 0'f32
+    for sy in 0 ..< Supersample:
+      let ys = float32(y) + (float32(sy) + 0.5'f32) * invSup
+      crossings.setLen(0)
+      for segmentIndex in 0 ..< geometry.geometryLen:
+        let seg = geometry.geometryAt(segmentIndex)
+        let
+          ay = seg.at.y
+          by = seg.to.y
+          lo = if ay < by: ay else: by
+          hi = if ay < by: by else: ay
+        if ys < lo or ys >= hi: continue
+        let
+          t = (ys - ay) / (by - ay)
+          x = seg.at.x + (seg.to.x - seg.at.x) * t
+          direction = if by > ay: 1 else: -1
+        crossings.add((x, direction))
+      if crossings.len == 0: continue
+      crossings.sort(proc(a, b: Crossing): int = cmp(a.x, b.x))
+      case windingRule
+      of NonZero:
+        var winding = 0
+        var spanStart = 0'f32
+        for crossing in crossings:
+          if winding == 0: spanStart = crossing.x
+          winding += crossing.dir
+          if winding == 0:
+            addSpan(coverage, width, spanStart, crossing.x, invSup)
+      of EvenOdd:
+        var inside = false
+        var spanStart = 0'f32
+        for crossing in crossings:
+          if not inside: spanStart = crossing.x
+          inside = not inside
+          if not inside:
+            addSpan(coverage, width, spanStart, crossing.x, invSup)
+    let rowOff = y * width * 4
+    for p in 0 ..< width:
+      if coverage[p] > 0'f32:
+        case blendMode
+        of NormalBlend:
+          blendOver(img, rowOff + p * 4, coverage[p], sr, sg, sb, sa)
+        of OverwriteBlend:
+          blendOverwrite(img, rowOff + p * 4, coverage[p], sr, sg, sb, sa)
+
 proc fillPath*(img: var uimg.Image[uint8]; path: Path; color: Color;
                windingRule: WindingRule = NonZero;
                tol = FlattenTolerance;
@@ -86,87 +171,14 @@ proc fillPath*(img: var uimg.Image[uint8]; path: Path; color: Color;
     color.spaceTag != tagUnknown
   body:
     let segments = path.flatten(tol)
-    if segments.len == 0:
-      return
-    let
-      width = img.width
-      height = img.height
-    # Row range the path touches, clipped to the image.
-    var minY = segments[0].at.y
-    var maxY = minY
-    for seg in segments:
-      for p in [seg.at, seg.to]:
-        if p.y < minY: minY = p.y
-        if p.y > maxY: maxY = p.y
-    if maxY < 0'f32 or minY > float32(height):
-      return
-    let
-      y0 = int(floor(max(minY, 0'f32)))
-      y1 = min(height - 1, int(ceil(min(maxY, float32(height)))))
-    if y0 > y1:
-      return
-    # Fill color -> gamut-mapped sRGB float + alpha in [0,1].
-    let converted = color.gamutMap(tagSrgb)
-    if converted.isErr:
-      raise newException(ValueError, "fillPath: color cannot be converted to sRGB")
-    let c = converted.get
-    let
-      sr = clamp(c.comp(0), 0'f32, 1'f32)
-      sg = clamp(c.comp(1), 0'f32, 1'f32)
-      sb = clamp(c.comp(2), 0'f32, 1'f32)
-      sa = clamp(c.alpha, 0'f32, 1'f32)
-    if sa <= 0'f32:
-      return
-    let invSup = 1'f32 / float32(Supersample)
-    var
-      coverage = newSeq[float32](width)
-      crossings: seq[Crossing] = @[]
-    for y in y0 .. y1:
-      for p in 0 ..< width:
-        coverage[p] = 0'f32
-      for sy in 0 ..< Supersample:
-        let ys = float32(y) + (float32(sy) + 0.5'f32) * invSup
-        crossings.setLen(0)
-        for seg in segments:
-          let
-            ay = seg.at.y
-            by = seg.to.y
-            lo = if ay < by: ay else: by
-            hi = if ay < by: by else: ay
-          if ys < lo or ys >= hi:
-            continue # half-open span avoids double-counting at vertices.
-          let
-            t = (ys - ay) / (by - ay)
-            x = seg.at.x + (seg.to.x - seg.at.x) * t
-            dir = if by > ay: 1 else: -1
-          crossings.add((x, dir))
-        if crossings.len == 0:
-          continue
-        crossings.sort(proc(a, b: Crossing): int = cmp(a.x, b.x))
-        case windingRule
-        of NonZero:
-          var winding = 0
-          var spanStart = 0'f32
-          for cr in crossings:
-            if winding == 0:
-              spanStart = cr.x
-            winding += cr.dir
-            if winding == 0:
-              addSpan(coverage, width, spanStart, cr.x, invSup)
-        of EvenOdd:
-          var inside = false
-          var spanStart = 0'f32
-          for cr in crossings:
-            if not inside:
-              spanStart = cr.x
-            inside = not inside
-            if not inside:
-              addSpan(coverage, width, spanStart, cr.x, invSup)
-      let rowOff = y * width * 4
-      for p in 0 ..< width:
-        if coverage[p] > 0'f32:
-          case blendMode
-          of NormalBlend:
-            blendOver(img, rowOff + p * 4, coverage[p], sr, sg, sb, sa)
-          of OverwriteBlend:
-            blendOverwrite(img, rowOff + p * 4, coverage[p], sr, sg, sb, sa)
+    img.fillGeometry(segments, color, windingRule, blendMode)
+
+proc fillPreparedPath*(img: var uimg.Image[uint8]; path: PreparedPath;
+                       color: Color; windingRule: WindingRule = NonZero;
+                       blendMode: BlendMode = NormalBlend) {.contractual.} =
+  ## Fill cached path geometry without flattening or recomputing its bounds.
+  require:
+    img.channels == 4
+    color.spaceTag != tagUnknown
+  body:
+    img.fillGeometry(path, color, windingRule, blendMode)
