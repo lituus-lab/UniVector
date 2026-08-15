@@ -140,6 +140,14 @@ def test_prepared_path_is_an_immutable_snapshot():
     assert isinstance(prepared.segments, tuple)
 
 
+def test_prepared_path_stroke_caps_and_validation():
+    p = univector.Path.parse_d("M 2 4 L 8 4")
+    outline = p.prepare().stroke(2, cap=univector.CAP_SQUARE)
+    assert outline.bounds() == pytest.approx((1, 3, 8, 2))
+    with pytest.raises(ValueError):
+        p.prepare().stroke(0)
+
+
 def test_geometry_helpers_and_command_metadata():
     assert univector.BLEND_NORMAL == 0
     assert univector.BLEND_OVERWRITE == 1

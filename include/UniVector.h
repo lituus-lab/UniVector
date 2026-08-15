@@ -72,6 +72,18 @@ typedef enum {
 } uv_blend_mode;
 
 typedef enum {
+  UV_CAP_BUTT = 0,
+  UV_CAP_ROUND = 1,
+  UV_CAP_SQUARE = 2
+} uv_line_cap;
+
+typedef enum {
+  UV_JOIN_MITER = 0,
+  UV_JOIN_ROUND = 1,
+  UV_JOIN_BEVEL = 2
+} uv_line_join;
+
+typedef enum {
   UV_PATH_CLOSE = 0,
   UV_PATH_MOVE,
   UV_PATH_LINE,
@@ -114,6 +126,7 @@ typedef struct {
 #define UNIVECTOR_MAX_FLATTEN_SEGMENTS 1048576
 #define UNIVECTOR_SUPERSAMPLE 4
 #define UNIVECTOR_GEOMETRIC_EPSILON 0.00031415927f
+#define UNIVECTOR_DEFAULT_MITER_LIMIT 4.0f
 
 /* Opaque handles. */
 typedef struct uv_path_handle* uv_path;
@@ -192,6 +205,10 @@ int     uv_prepared_path_segment_get(uv_prepared_path h, size_t index,
 int     uv_prepared_path_bounds(uv_prepared_path h, uv_rect* out_bounds);
 float   uv_prepared_path_tolerance(uv_prepared_path h);
 void    uv_prepared_path_free(uv_prepared_path h);
+/* Expand centerlines into a filled path. Returns NULL on invalid style or
+ * allocation failure. The returned path is released with uv_path_free. */
+uv_path uv_prepared_path_stroke(uv_prepared_path h, float width, int cap,
+                                int join, float miter_limit);
 
 /* --- image --- */
 /* A zeroed (transparent) RGBA8 image. NULL on bad dimensions or allocation

@@ -81,6 +81,12 @@ int main(void) {
   uv_rect prepared_bounds = {0};
   assert(uv_prepared_path_bounds(prepared, &prepared_bounds) == UV_OK);
   assert(prepared_bounds.w == 4.0f && prepared_bounds.h == 4.0f);
+  uv_path stroked = uv_prepared_path_stroke(
+      prepared, 2.0f, UV_CAP_ROUND, UV_JOIN_BEVEL,
+      UNIVECTOR_DEFAULT_MITER_LIMIT);
+  assert(stroked != NULL);
+  assert(uv_path_command_count(stroked) > 0);
+  uv_path_free(stroked);
   uv_prepared_path_free(prepared);
 
   uv_vec2 midpoint = {0};

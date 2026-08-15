@@ -94,7 +94,7 @@ Build the format-independent representation before adding document parsers.
 ## Rendering and conformance
 
 - [ ] Cache flattened segments and bounds in immutable prepared paths.
-- [ ] Expand strokes with butt, round, and square caps and miter, round, and
+- [x] Expand strokes with butt, round, and square caps and miter, round, and
   bevel joins.
 - [ ] Tessellate fills and strokes into validated renderer-neutral indexed
   triangle meshes.
@@ -103,7 +103,7 @@ Build the format-independent representation before adding document parsers.
   tessellation, and prepared raster filling with deterministic workloads.
 - [ ] Apply transforms before flattening without losing the requested error
   tolerance.
-- [ ] Add stroke expansion, joins, caps, dashes, and marker placement.
+- [ ] Add stroke dash arrays and marker placement.
 - [ ] Add gradient and pattern sampling with explicit color-space behavior.
 - [ ] Add clipping, masking, group opacity, and compositing in the correct
   order.

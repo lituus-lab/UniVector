@@ -69,6 +69,8 @@ print(path.bounds(0.25))  # (x, y, width, height)
 prepared = path.prepare(0.25)
 print(prepared.bounds)
 print(prepared.segments)  # immutable tuple snapshot
+outline = prepared.stroke(2, cap=univector.CAP_ROUND,
+                          join=univector.JOIN_BEVEL)
 ```
 
 The tolerance is the subdivision threshold used against each curve span. A
@@ -96,13 +98,15 @@ parameters.
   `elliptical_arc_to`, `arc`, `arc_to`, `rect`, `rounded_rect`, `ellipse`,
   `circle`, `polygon`, `close_path`, `add_path`, `copy`, `parse_d`, `to_d`,
   `to_svg`, `flatten`, `prepare`, `bounds`, `current`, `start`, and `commands`.
-- `PreparedPath`: `segments`, `bounds`, `tolerance`, and `len`.
+- `PreparedPath`: `segments`, `bounds`, `tolerance`, `stroke`, and `len`.
 - `Image`: `width`, `height`, `channels`, `pixels`, `fill`, and `encode_png`.
 - `Color`: `parse`, `rgba`, and `to_svg`.
 - Geometry: `quad_point`, `cubic_point`, and `compute_bounds`.
 - Command metadata: `is_relative`, `parameter_count`, and `PATH_*` constants.
 - Rendering constants: `WINDING_NON_ZERO`, `WINDING_EVEN_ODD`,
   `BLEND_NORMAL`, `BLEND_OVERWRITE`, `GEOMETRIC_EPSILON`,
+  `CAP_BUTT`, `CAP_ROUND`, `CAP_SQUARE`, `JOIN_MITER`, `JOIN_ROUND`,
+  `JOIN_BEVEL`, `DEFAULT_MITER_LIMIT`,
   `FLATTEN_TOLERANCE`, `MAX_FLATTEN_DEPTH`, `MAX_FLATTEN_SEGMENTS`, and
   `SUPERSAMPLE`.
 - Runtime: `version`, `abi_version`, and `strerror`.

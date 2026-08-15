@@ -12,12 +12,14 @@ import UniVector/common
 import UniVector/path
 import UniVector/flatten
 import UniVector/prepared
+import UniVector/stroke
 import UniVector/raster
 import UniVector/svg
 export common
 export path
 export flatten
 export prepared
+export stroke
 export raster
 export svg
 

@@ -15,6 +15,7 @@ cdef extern from "UniVector.h":
     int    UNIVECTOR_MAX_FLATTEN_SEGMENTS
     int    UNIVECTOR_SUPERSAMPLE
     float  UNIVECTOR_GEOMETRIC_EPSILON
+    float  UNIVECTOR_DEFAULT_MITER_LIMIT
     const char *uv_version()
     void   uv_init()
     int    uv_abi_version()
@@ -92,6 +93,8 @@ cdef extern from "UniVector.h":
     int      uv_prepared_path_bounds(uv_prepared_path h, uv_rect* out_bounds)
     float    uv_prepared_path_tolerance(uv_prepared_path h)
     void     uv_prepared_path_free(uv_prepared_path h)
+    uv_path  uv_prepared_path_stroke(uv_prepared_path h, float width,
+                                     int cap, int join, float miter_limit)
 
     uv_image uv_image_new(int width, int height)
     int      uv_image_width(uv_image h)
@@ -124,6 +127,13 @@ SUPERSAMPLE = UNIVECTOR_SUPERSAMPLE
 GEOMETRIC_EPSILON = UNIVECTOR_GEOMETRIC_EPSILON
 BLEND_NORMAL = 0
 BLEND_OVERWRITE = 1
+CAP_BUTT = 0
+CAP_ROUND = 1
+CAP_SQUARE = 2
+JOIN_MITER = 0
+JOIN_ROUND = 1
+JOIN_BEVEL = 2
+DEFAULT_MITER_LIMIT = UNIVECTOR_DEFAULT_MITER_LIMIT
 
 PATH_CLOSE = 0
 PATH_MOVE = 1
@@ -485,6 +495,15 @@ cdef class PreparedPath:
             result.append(((segment.at.x, segment.at.y),
                            (segment.to.x, segment.to.y)))
         return tuple(result)
+
+    def stroke(self, float width, int cap=CAP_BUTT, int join=JOIN_MITER,
+               float miter_limit=DEFAULT_MITER_LIMIT):
+        """Expand this centerline into a filled Path."""
+        cdef uv_path h = uv_prepared_path_stroke(
+            self._h, width, cap, join, miter_limit)
+        if h == NULL:
+            raise ValueError("stroke failed: invalid style or allocation")
+        return Path._wrap(h)
 
 cdef class Image:
     """An RGBA8 raster surface. The library owns the handle; freed on GC."""
