@@ -24,7 +24,8 @@ repository state instead of the manifest.
 
 1. UniVector never redefines vectors, colors, raster images, or codecs.
 2. Dependencies do not import UniVector.
-3. Internal modules follow `common < path < flatten < raster/svg < c_api`.
+3. Internal modules follow
+   `common < path < flatten < prepared < stroke < mesh < raster/svg < c_api`.
 4. `nimble checkVGraph` rejects an import that violates that order.
 5. The C and Python façades call the Nim algorithms; they do not reimplement
    geometry or rasterization.
