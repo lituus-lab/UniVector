@@ -88,6 +88,9 @@ func copy*(path: Path): Path {.inline.} =
   for i, command in path.commands:
     result.commands[i] = command
 
+func isFinite(value: float32): bool {.inline.} =
+  classify(value) in {fcNormal, fcSubnormal, fcZero}
+
 proc advanceState(path: var Path, commands: openArray[PathCommand]) =
   ## Apply `commands` to the current builder state.
   var at = path.at
@@ -134,6 +137,45 @@ proc refreshState(path: var Path) =
   path.at = vec2(0'f32, 0'f32)
   path.start = vec2(0'f32, 0'f32)
   path.advanceState(path.commands)
+
+proc translated*(path: Path; dx, dy: float32): Path {.contractual.} =
+  ## Return an independent path translated by (`dx`, `dy`).
+  ##
+  ## Relative commands retain their offsets. Absolute coordinates, including
+  ## Bezier controls and arc endpoints, are translated directly.
+  require:
+    dx.isFinite and dy.isFinite
+  ensure:
+    result.commands.len == path.commands.len
+  body:
+    if not dx.isFinite or not dy.isFinite:
+      raise newException(ValueError, "path translation must be finite")
+    result = path.copy
+    let offset = vec2(dx, dy)
+    for index, command in result.commands.mpairs:
+      case command.kind
+      of pClose, pRLine, pRHLine, pRVLine, pRCubic, pRSCubic,
+          pRQuad, pRTQuad, pRArc:
+        discard
+      of pRMove:
+        if index == 0:
+          command.p += offset
+      of pMove, pLine, pTQuad:
+        command.p += offset
+      of pHLine:
+        command.v += dx
+      of pVLine:
+        command.v += dy
+      of pCubic:
+        command.c1 += offset
+        command.c2 += offset
+        command.c3 += offset
+      of pSCubic, pQuad:
+        command.c += offset
+        command.e += offset
+      of pArc:
+        command.a += offset
+    result.refreshState()
 
 proc addPath*(path: var Path, other: Path) {.inline.} =
   ## Append `other`'s commands to `path`.
