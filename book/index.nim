@@ -56,9 +56,19 @@ nbCode:
   echo "commands = ", parsed.commands.len
   echo "current after close = ", parsed.at
 
+  let shifted = parsed.translated(12'f32, 8'f32)
+  doAssert shifted.commands.len == parsed.commands.len
+  doAssert shifted.at == parsed.at + vec2(12'f32, 8'f32)
+  doAssert parsed.at == vec2(10'f32, 50'f32)
+  echo "translated current = ", shifted.at
+
 nbText: """
 `Path.at` and `Path.start` are builder state. Parsing computes them too, so a
 parsed path can immediately be extended with another command.
+
+`translated` returns an independent path and preserves its command structure.
+Offsets must be finite. The source path remains unchanged, which makes the
+operation safe for retained scenes and repeated layout.
 
 ## Bézier curves
 

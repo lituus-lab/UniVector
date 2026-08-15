@@ -141,8 +141,9 @@ proc refreshState(path: var Path) =
 proc translated*(path: Path; dx, dy: float32): Path {.contractual.} =
   ## Return an independent path translated by (`dx`, `dy`).
   ##
-  ## Relative commands retain their offsets. Absolute coordinates, including
-  ## Bezier controls and arc endpoints, are translated directly.
+  ## Relative drawing commands retain their offsets; an initial relative
+  ## `moveTo` absorbs the translation. Absolute coordinates, including Bezier
+  ## controls and arc endpoints, are translated directly.
   require:
     dx.isFinite and dy.isFinite
   ensure:

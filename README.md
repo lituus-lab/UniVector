@@ -48,6 +48,9 @@ image.fillPath(path, parseColor("#3366cc").get)
 
 let png = encodeImage(image, efPng, 90)
 let svg = toSvgString(path, parseColor("#3366cc").get, 64, 64)
+
+# Independent translated copy; `path` is unchanged.
+let shifted = path.translated(64'f32, 0'f32)
 ```
 
 Install and validate the repository with:
