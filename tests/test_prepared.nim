@@ -36,6 +36,16 @@ suite "prepared paths":
     check prepared.segment(0) == Segment(at: vec2(0'f32, 0'f32),
         to: vec2(2'f32, 3'f32))
 
+  test "borrowed segment view is ordered":
+    let prepared = parsePath("M 0 0 L 2 0 L 2 3").preparePath()
+    check prepared.segmentView == prepared.segments
+
+  test "a mutable segment snapshot does not alter borrowed storage":
+    let prepared = parsePath("M 0 0 L 2 0 L 2 3").preparePath()
+    var snapshot = prepared.segmentView
+    snapshot[0].to = vec2(9'f32, 9'f32)
+    check prepared.segment(0).to == vec2(2'f32, 0'f32)
+
   test "empty paths have empty bounds":
     let prepared = newPath().preparePath()
     check prepared.len == 0
