@@ -15,6 +15,10 @@ stable C ABI, and Python.
   circles, rounded rectangles, and regular polygons.
 - Adaptive quadratic and cubic Bézier subdivision and SVG arc flattening.
 - Segment bounds and point evaluation for quadratic and cubic curves.
+- Contract-checked stroke expansion with caps, joins, miter limits, and
+  repeating dash patterns.
+- Fill-ready circle, square, triangle, diamond, plus, and cross marker paths,
+  including fixed- and variable-size batches.
 - A scanline solid-fill rasterizer with non-zero and even-odd winding rules.
 - SVG serialization and PNG encoding through UniImage.
 
@@ -105,7 +109,10 @@ Prepared paths flatten once, retain the tolerance and bounds, and expose
 read-only segment snapshots. They are intended for geometry caches shared by
 CPU and GPU renderers; they do not retain or observe later path mutations.
 `PreparedPath.stroke()` expands centerlines with explicit width, cap, join,
-and miter-limit settings and returns a normal filled path.
+miter-limit, dash-pattern, and dash-offset settings and returns a normal
+filled path. Marker constructors likewise return ordinary paths, so the same
+fill and tessellation backends handle plot symbols without a parallel geometry
+model.
 `PreparedPath.tessellate_fill()` and `tessellate_stroke()` produce immutable
 renderer-neutral vertices and triangle indices ready for GPU upload.
 `fillPreparedPath` and Python's `Image.fill_prepared()` reuse the same cached
@@ -136,9 +143,10 @@ combines that guide with the generated Nim API reference under `pages/`.
 ## Benchmarks
 
 `nimble bench` runs a deterministic local benchmark for path parsing,
-flattening, and raster filling. It reports timings for the current machine; the
-repository does not publish cross-library rankings because compiler flags,
-image sizes, tolerances, and hardware materially change the result.
+flattening, solid and dashed stroke expansion, marker batches, tessellation,
+and raster filling. It reports timings for the current machine; the repository
+does not publish cross-library rankings because compiler flags, image sizes,
+tolerances, and hardware materially change the result.
 
 ## Provenance & development
 

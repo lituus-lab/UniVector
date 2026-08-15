@@ -103,7 +103,7 @@ Build the format-independent representation before adding document parsers.
   tessellation, and prepared raster filling with deterministic workloads.
 - [ ] Apply transforms before flattening without losing the requested error
   tolerance.
-- [ ] Add stroke dash arrays and marker placement.
+- [x] Add stroke dash arrays and marker placement.
 - [ ] Add gradient and pattern sampling with explicit color-space behavior.
 - [ ] Add clipping, masking, group opacity, and compositing in the correct
   order.
