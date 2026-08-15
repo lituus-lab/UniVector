@@ -33,6 +33,37 @@ suite "path construction":
     q.commands[0].p = vec2(8'f32, 9'f32)
     check p.commands[0].p == vec2(1'f32, 2'f32)
 
+  test "translation preserves commands and moves absolute geometry":
+    let source = parsePath(
+      "M 1 2 H 3 V 4 C 5 6 7 8 9 10 S 11 12 13 14 " &
+      "Q 15 16 17 18 T 19 20 A 2 3 15 0 1 21 22 z")
+    let shifted = source.translated(10'f32, -2'f32)
+    check shifted.commands.len == source.commands.len
+    check $shifted == $parsePath(
+      "M 11 0 H 13 V 2 C 15 4 17 6 19 8 S 21 10 23 12 " &
+      "Q 25 14 27 16 T 29 18 A 2 3 15 0 1 31 20 z")
+    check shifted.at == vec2(11'f32, 0'f32)
+    check source.at == vec2(1'f32, 2'f32)
+
+  test "translation leaves relative offsets unchanged":
+    let source = parsePath("m 1 2 l 3 4 c 1 2 3 4 5 6 z")
+    let shifted = source.translated(10'f32, -2'f32)
+    check $shifted == $parsePath("m 11 0 l 3 4 c 1 2 3 4 5 6 z")
+    check shifted.at == vec2(11'f32, 0'f32)
+    check source.at == vec2(1'f32, 2'f32)
+
+  test "translation rejects non-finite offsets in every build mode":
+    when not defined(release):
+      expect PreConditionDefect:
+        discard newPath().translated(Inf.float32, 0'f32)
+      expect PreConditionDefect:
+        discard newPath().translated(NaN.float32, 0'f32)
+    else:
+      expect ValueError:
+        discard newPath().translated(Inf.float32, 0'f32)
+      expect ValueError:
+        discard newPath().translated(NaN.float32, 0'f32)
+
   test "addPath updates the current builder state":
     var p = newPath()
     p.moveTo(1'f32, 1'f32)
