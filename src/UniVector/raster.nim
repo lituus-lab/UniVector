@@ -75,14 +75,8 @@ proc blendOverwrite(img: var uimg.Image[uint8]; idx: int;
   img.data[idx + 3] = uint8(a * 255'f32 + 0.5'f32)
 
 func geometryLen(segments: seq[Segment]): int {.inline.} = segments.len
-func geometryLen(path: PreparedPath): int {.inline.} = path.len
-func geometryAt(segments: seq[Segment]; index: int): Segment {.inline.} =
-  segments[index]
-func geometryAt(path: PreparedPath; index: int): Segment {.inline.} =
-  path.segment(index)
 func geometryBounds(segments: seq[Segment]): Rect {.inline.} =
   segments.computeBounds()
-func geometryBounds(path: PreparedPath): Rect {.inline.} = path.bounds
 
 proc fillGeometry[Geometry](img: var uimg.Image[uint8]; geometry: Geometry;
     color: Color; windingRule: WindingRule; blendMode: BlendMode) =
@@ -117,8 +111,7 @@ proc fillGeometry[Geometry](img: var uimg.Image[uint8]; geometry: Geometry;
     for sy in 0 ..< Supersample:
       let ys = float32(y) + (float32(sy) + 0.5'f32) * invSup
       crossings.setLen(0)
-      for segmentIndex in 0 ..< geometry.geometryLen:
-        let seg = geometry.geometryAt(segmentIndex)
+      for seg in geometry:
         let
           ay = seg.at.y
           by = seg.to.y
@@ -181,4 +174,5 @@ proc fillPreparedPath*(img: var uimg.Image[uint8]; path: PreparedPath;
     img.channels == 4
     color.spaceTag != tagUnknown
   body:
-    img.fillGeometry(path, color, windingRule, blendMode)
+    let segments = path.segmentView
+    img.fillGeometry(segments, color, windingRule, blendMode)
