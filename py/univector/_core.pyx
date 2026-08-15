@@ -14,6 +14,8 @@ cdef extern from "UniVector.h":
     int    UNIVECTOR_MAX_FLATTEN_DEPTH
     int    UNIVECTOR_MAX_FLATTEN_SEGMENTS
     int    UNIVECTOR_SUPERSAMPLE
+    int    UNIVECTOR_MAX_MESH_VERTICES
+    int    UNIVECTOR_MAX_MESH_INDICES
     float  UNIVECTOR_GEOMETRIC_EPSILON
     float  UNIVECTOR_DEFAULT_MITER_LIMIT
     const char *uv_version()
@@ -23,6 +25,7 @@ cdef extern from "UniVector.h":
 
     ctypedef void* uv_path
     ctypedef void* uv_prepared_path
+    ctypedef void* uv_mesh
     ctypedef void* uv_image
     ctypedef void* uv_color
 
@@ -37,6 +40,9 @@ cdef extern from "UniVector.h":
     ctypedef struct uv_segment:
         uv_vec2 at
         uv_vec2 to
+    ctypedef struct uv_vector_vertex:
+        uv_vec2 position
+        float coverage
     ctypedef struct uv_path_command:
         int kind
         float params[7]
@@ -95,6 +101,14 @@ cdef extern from "UniVector.h":
     void     uv_prepared_path_free(uv_prepared_path h)
     uv_path  uv_prepared_path_stroke(uv_prepared_path h, float width,
                                      int cap, int join, float miter_limit)
+    uv_mesh  uv_prepared_path_tessellate_fill(uv_prepared_path h, int winding)
+    size_t   uv_mesh_vertex_count(uv_mesh h)
+    size_t   uv_mesh_index_count(uv_mesh h)
+    int      uv_mesh_vertex_get(uv_mesh h, size_t index,
+                                uv_vector_vertex* out_vertex)
+    int      uv_mesh_index_get(uv_mesh h, size_t position,
+                               unsigned int* out_index)
+    void     uv_mesh_free(uv_mesh h)
 
     uv_image uv_image_new(int width, int height)
     int      uv_image_width(uv_image h)
@@ -123,6 +137,8 @@ WINDING_EVEN_ODD = 1
 FLATTEN_TOLERANCE = UNIVECTOR_FLATTEN_TOLERANCE
 MAX_FLATTEN_DEPTH = UNIVECTOR_MAX_FLATTEN_DEPTH
 MAX_FLATTEN_SEGMENTS = UNIVECTOR_MAX_FLATTEN_SEGMENTS
+MAX_MESH_VERTICES = UNIVECTOR_MAX_MESH_VERTICES
+MAX_MESH_INDICES = UNIVECTOR_MAX_MESH_INDICES
 SUPERSAMPLE = UNIVECTOR_SUPERSAMPLE
 GEOMETRIC_EPSILON = UNIVECTOR_GEOMETRIC_EPSILON
 BLEND_NORMAL = 0
@@ -504,6 +520,63 @@ cdef class PreparedPath:
         if h == NULL:
             raise ValueError("stroke failed: invalid style or allocation")
         return Path._wrap(h)
+
+    def tessellate_fill(self, int winding=WINDING_NON_ZERO):
+        """Build a renderer-neutral indexed triangle mesh."""
+        cdef uv_mesh h = uv_prepared_path_tessellate_fill(self._h, winding)
+        if h == NULL:
+            raise ValueError("tessellate_fill failed")
+        return VectorMesh._wrap(h)
+
+
+cdef class VectorMesh:
+    """Immutable indexed triangles produced by UniVector."""
+    cdef uv_mesh _h
+
+    def __cinit__(self): self._h = NULL
+
+    def __dealloc__(self):
+        if self._h != NULL:
+            uv_mesh_free(self._h)
+            self._h = NULL
+
+    @staticmethod
+    cdef VectorMesh _wrap(uv_mesh h):
+        cdef VectorMesh result = VectorMesh.__new__(VectorMesh)
+        result._h = h
+        return result
+
+    def __init__(self):
+        raise TypeError("VectorMesh values are created by tessellation")
+
+    @property
+    def vertices(self):
+        cdef size_t count = uv_mesh_vertex_count(self._h)
+        cdef size_t i
+        cdef uv_vector_vertex vertex
+        result = []
+        for i in range(count):
+            if uv_mesh_vertex_get(self._h, i, &vertex) != 0:
+                raise RuntimeError("mesh changed while reading vertices")
+            result.append(((vertex.position.x, vertex.position.y),
+                           vertex.coverage))
+        return tuple(result)
+
+    @property
+    def indices(self):
+        cdef size_t count = uv_mesh_index_count(self._h)
+        cdef size_t i
+        cdef unsigned int index
+        result = []
+        for i in range(count):
+            if uv_mesh_index_get(self._h, i, &index) != 0:
+                raise RuntimeError("mesh changed while reading indices")
+            result.append(index)
+        return tuple(result)
+
+    @property
+    def triangle_count(self):
+        return uv_mesh_index_count(self._h) // 3
 
 cdef class Image:
     """An RGBA8 raster surface. The library owns the handle; freed on GC."""

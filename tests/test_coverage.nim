@@ -8,6 +8,7 @@ import test_path
 import test_flatten
 import test_prepared
 import test_stroke
+import test_mesh
 import test_raster
 import test_svg
 {.pop.}

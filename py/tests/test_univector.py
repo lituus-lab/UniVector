@@ -148,6 +148,17 @@ def test_prepared_path_stroke_caps_and_validation():
         p.prepare().stroke(0)
 
 
+def test_fill_mesh_is_indexed_and_immutable():
+    p = univector.Path()
+    p.rect(0, 0, 4, 4)
+    mesh = p.prepare().tessellate_fill()
+    assert mesh.triangle_count == 2
+    assert len(mesh.vertices) == 4
+    assert len(mesh.indices) == 6
+    assert max(mesh.indices) < len(mesh.vertices)
+    assert isinstance(mesh.vertices, tuple)
+
+
 def test_geometry_helpers_and_command_metadata():
     assert univector.BLEND_NORMAL == 0
     assert univector.BLEND_OVERWRITE == 1

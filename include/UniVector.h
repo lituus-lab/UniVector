@@ -11,8 +11,8 @@
  *   - Call uv_init() before any other function. Repeated calls are harmless;
  *     externally synchronise the first call.
  *   - Handles are opaque. The library owns them; release with the matching
- *     uv_path_free / uv_prepared_path_free / uv_image_free / uv_color_free
- *     (NULL is a no-op).
+ *     uv_path_free / uv_prepared_path_free / uv_mesh_free / uv_image_free /
+ *     uv_color_free (NULL is a no-op).
  *   - uv_path_to_d / uv_path_to_svg / uv_color_to_svg / uv_image_encode_png
  *     allocate a buffer the caller frees with uv_buffer_free. uv_image_pixels
  *     *borrows* the image buffer (valid until uv_image_free) and must NOT be
@@ -108,6 +108,7 @@ typedef enum {
 typedef struct { float x, y; } uv_vec2;
 typedef struct { float x, y, w, h; } uv_rect;
 typedef struct { uv_vec2 at, to; } uv_segment;
+typedef struct { uv_vec2 position; float coverage; } uv_vector_vertex;
 typedef struct {
   int kind;
   float params[7];
@@ -127,10 +128,13 @@ typedef struct {
 #define UNIVECTOR_SUPERSAMPLE 4
 #define UNIVECTOR_GEOMETRIC_EPSILON 0.00031415927f
 #define UNIVECTOR_DEFAULT_MITER_LIMIT 4.0f
+#define UNIVECTOR_MAX_MESH_VERTICES 4194304
+#define UNIVECTOR_MAX_MESH_INDICES 6291456
 
 /* Opaque handles. */
 typedef struct uv_path_handle* uv_path;
 typedef struct uv_prepared_path_handle* uv_prepared_path;
+typedef struct uv_mesh_handle* uv_mesh;
 typedef struct uv_image_handle* uv_image;
 typedef struct uv_color_handle* uv_color;
 
@@ -209,6 +213,15 @@ void    uv_prepared_path_free(uv_prepared_path h);
  * allocation failure. The returned path is released with uv_path_free. */
 uv_path uv_prepared_path_stroke(uv_prepared_path h, float width, int cap,
                                 int join, float miter_limit);
+
+/* --- mesh --- */
+uv_mesh uv_prepared_path_tessellate_fill(uv_prepared_path h, int winding);
+size_t  uv_mesh_vertex_count(uv_mesh h);
+size_t  uv_mesh_index_count(uv_mesh h);
+int     uv_mesh_vertex_get(uv_mesh h, size_t index,
+                           uv_vector_vertex* out_vertex);
+int     uv_mesh_index_get(uv_mesh h, size_t position, uint32_t* out_index);
+void    uv_mesh_free(uv_mesh h);
 
 /* --- image --- */
 /* A zeroed (transparent) RGBA8 image. NULL on bad dimensions or allocation
