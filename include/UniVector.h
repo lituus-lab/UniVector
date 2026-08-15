@@ -216,6 +216,8 @@ uv_path uv_prepared_path_stroke(uv_prepared_path h, float width, int cap,
 
 /* --- mesh --- */
 uv_mesh uv_prepared_path_tessellate_fill(uv_prepared_path h, int winding);
+uv_mesh uv_prepared_path_tessellate_stroke(
+    uv_prepared_path h, float width, int cap, int join, float miter_limit);
 size_t  uv_mesh_vertex_count(uv_mesh h);
 size_t  uv_mesh_index_count(uv_mesh h);
 int     uv_mesh_vertex_get(uv_mesh h, size_t index,

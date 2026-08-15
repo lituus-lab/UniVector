@@ -106,8 +106,8 @@ read-only segment snapshots. They are intended for geometry caches shared by
 CPU and GPU renderers; they do not retain or observe later path mutations.
 `PreparedPath.stroke()` expands centerlines with explicit width, cap, join,
 and miter-limit settings and returns a normal filled path.
-`PreparedPath.tessellate_fill()` produces immutable renderer-neutral vertices
-and triangle indices ready for upload by a GPU backend.
+`PreparedPath.tessellate_fill()` and `tessellate_stroke()` produce immutable
+renderer-neutral vertices and triangle indices ready for GPU upload.
 
 ## Uni* family
 

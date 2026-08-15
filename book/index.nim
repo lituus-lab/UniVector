@@ -164,6 +164,10 @@ nbCode:
   doAssert mesh.triangleCount == 2
   doAssert mesh.indexCount == 6
   echo "mesh vertices = ", mesh.vertexCount
+  let strokeMesh = preparedCurve.tessellateStroke(StrokeStyle(
+      width: 3'f32, cap: RoundCap, join: BevelJoin, miterLimit: 4'f32))
+  doAssert strokeMesh.triangleCount > 0
+  echo "stroke triangles = ", strokeMesh.triangleCount
 
 nbText: """
 NonZero and EvenOdd winding are both supported, including nested contours.
