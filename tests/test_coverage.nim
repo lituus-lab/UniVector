@@ -6,6 +6,7 @@
 import test_version
 import test_path
 import test_flatten
+import test_prepared
 import test_raster
 import test_svg
 {.pop.}

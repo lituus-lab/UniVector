@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
 import std/[sequtils, unittest]
+from contracts import PreConditionDefect
 import UniVector
 
 proc approx(a, b: float32; eps = 1e-3'f32): bool = abs(a - b) <= eps
@@ -103,3 +104,10 @@ suite "flatten":
     p.moveTo(5'f32, 5'f32)
     p.bezierCurveTo(5'f32, 5'f32, 5'f32, 5'f32, 5'f32, 5'f32)
     check p.flatten().len == 1
+
+  when not defined(release):
+    test "contour flattening rejects non-positive tolerance before mutation":
+      var contours = @[FlattenContour(first: 1, count: 2, closed: true)]
+      expect PreConditionDefect:
+        discard newPath().flattenWithContours(0'f32, contours)
+      check contours == @[FlattenContour(first: 1, count: 2, closed: true)]

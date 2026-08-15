@@ -24,6 +24,7 @@ int main(void) {
 
   /* NULL-safety: benign returns, no crash. */
   uv_path_free(NULL);
+  uv_prepared_path_free(NULL);
   uv_image_free(NULL);
   uv_color_free(NULL);
   uv_buffer_free(NULL, 0);
@@ -71,6 +72,16 @@ int main(void) {
   assert(uv_segments_bounds(segments, segment_count, &bounds) == UV_OK);
   assert(bounds.x == 0.0f && bounds.y == 0.0f);
   assert(bounds.w == 4.0f && bounds.h == 4.0f);
+  uv_prepared_path prepared = uv_path_prepare(p, 0.25f);
+  assert(prepared != NULL);
+  assert(uv_prepared_path_segment_count(prepared) == 4);
+  assert(uv_prepared_path_tolerance(prepared) == 0.25f);
+  uv_segment prepared_segment = {0};
+  assert(uv_prepared_path_segment_get(prepared, 0, &prepared_segment) == UV_OK);
+  uv_rect prepared_bounds = {0};
+  assert(uv_prepared_path_bounds(prepared, &prepared_bounds) == UV_OK);
+  assert(prepared_bounds.w == 4.0f && prepared_bounds.h == 4.0f);
+  uv_prepared_path_free(prepared);
 
   uv_vec2 midpoint = {0};
   uv_vec2 p0 = {0.0f, 0.0f};

@@ -11,13 +11,14 @@
 import UniVector/common
 import UniVector/path
 import UniVector/flatten
+import UniVector/prepared
 import UniVector/raster
 import UniVector/svg
 export common
 export path
 export flatten
+export prepared
 export raster
 export svg
 
 const UniVectorVersion* = "1.0.0"
-

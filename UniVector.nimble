@@ -38,6 +38,7 @@ task test, "Nim tests (debug, contracts active)":
   exec "nim c -r --path:src -o:build/test_version tests/test_version.nim"
   exec "nim c -r --path:src -o:build/test_path tests/test_path.nim"
   exec "nim c -r --path:src -o:build/test_flatten tests/test_flatten.nim"
+  exec "nim c -r --path:src -o:build/test_prepared tests/test_prepared.nim"
   exec "nim c -r --path:src -o:build/test_raster tests/test_raster.nim"
   exec "nim c -r --path:src -o:build/test_svg tests/test_svg.nim"
 
@@ -45,6 +46,7 @@ task testRelease, "Nim tests (release, contracts compiled away)":
   exec "nim c -r -d:release --path:src -o:build/test_version_rel tests/test_version.nim"
   exec "nim c -r -d:release --path:src -o:build/test_path_rel tests/test_path.nim"
   exec "nim c -r -d:release --path:src -o:build/test_flatten_rel tests/test_flatten.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_prepared_rel tests/test_prepared.nim"
   exec "nim c -r -d:release --path:src -o:build/test_raster_rel tests/test_raster.nim"
   exec "nim c -r -d:release --path:src -o:build/test_svg_rel tests/test_svg.nim"
 

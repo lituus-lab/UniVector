@@ -87,8 +87,9 @@ from source requires Nim and Nimble on `PATH`.
 import univector
 
 path = univector.Path.parse_d("M 8 8 H 56 V 56 H 8 Z")
-segments = path.flatten()
-assert path.bounds() == (8.0, 8.0, 48.0, 48.0)
+prepared = path.prepare()
+assert prepared.bounds == (8.0, 8.0, 48.0, 48.0)
+segments = prepared.segments
 
 image = univector.Image(64, 64)
 color = univector.Color.parse("oklch(62% 0.17 255)")
@@ -99,6 +100,10 @@ svg = path.to_svg(color, 64, 64)
 
 See [`py/README.md`](py/README.md) for installation, ownership, errors, and the
 complete Python surface.
+
+Prepared paths flatten once, retain the tolerance and bounds, and expose
+read-only segment snapshots. They are intended for geometry caches shared by
+CPU and GPU renderers; they do not retain or observe later path mutations.
 
 ## Uni* family
 

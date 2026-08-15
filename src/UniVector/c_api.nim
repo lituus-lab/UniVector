@@ -9,8 +9,8 @@
 ##     initialiser). Repeated calls are harmless; externally synchronise the
 ##     first call.
 ##   * Handles are opaque `void*`. The library owns them; free with the
-##     matching `uv_path_free` / `uv_image_free` / `uv_color_free`. NULL is a
-##     no-op for every free.
+##     matching `uv_path_free` / `uv_prepared_path_free` / `uv_image_free` /
+##     `uv_color_free`. NULL is a no-op for every free.
 ##   * `uv_path_to_d`, `uv_path_to_svg`, `uv_color_to_svg`, and
 ##     `uv_image_encode_png` allocate a C-owned buffer; free it with
 ##     `uv_buffer_free`. `uv_image_pixels` *borrows* the image buffer (valid
@@ -52,6 +52,8 @@ type
     params: array[7, float32]
   PathHandle = ref object
     path: Path
+  PreparedPathHandle = ref object
+    path: PreparedPath
   ImgHandle = ref object
     img: uimg.Image[uint8]
   ColorHandle = ref object
@@ -60,6 +62,8 @@ type
 proc NimMain() {.importc.}
 
 proc pathOf(p: pointer): PathHandle {.inline.} = cast[PathHandle](p)
+proc preparedPathOf(p: pointer): PreparedPathHandle {.inline.} =
+  cast[PreparedPathHandle](p)
 proc imgOf(p: pointer): ImgHandle {.inline.} = cast[ImgHandle](p)
 proc colorOf(p: pointer): ColorHandle {.inline.} = cast[ColorHandle](p)
 
@@ -409,6 +413,57 @@ proc uv_segments_bounds(segments: ptr UvSegment; count: csize_t;
     UV_OK
   except CatchableError, Defect:
     UV_ERR_FORMAT
+
+# --------------------------- prepared path ---------------------------------
+
+proc uv_path_prepare(h: pointer; tol: float32): pointer =
+  if h == nil or not allFinite([tol]): return nil
+  let effectiveTol = if tol > 0'f32: tol else: FlattenTolerance
+  try:
+    let prepared = PreparedPathHandle(path: pathOf(h).path.preparePath(effectiveTol))
+    GC_ref(prepared)
+    cast[pointer](prepared)
+  except CatchableError, Defect:
+    nil
+
+proc uv_prepared_path_segment_count(h: pointer): csize_t =
+  if h == nil: return 0
+  try:
+    csize_t(preparedPathOf(h).path.len)
+  except CatchableError, Defect:
+    0
+
+proc uv_prepared_path_segment_get(h: pointer; index: csize_t;
+    outSegment: ptr UvSegment): cint =
+  if h == nil or outSegment == nil or index > csize_t(high(int)):
+    return UV_ERR_FORMAT
+  try:
+    let prepared = preparedPathOf(h).path
+    if index >= csize_t(prepared.len): return UV_ERR_FORMAT
+    outSegment[] = prepared.segment(int(index)).toC
+    UV_OK
+  except CatchableError, Defect:
+    UV_ERR_FORMAT
+
+proc uv_prepared_path_bounds(h: pointer; outBounds: ptr UvRect): cint =
+  if h == nil or outBounds == nil: return UV_ERR_FORMAT
+  try:
+    outBounds[] = preparedPathOf(h).path.bounds.toC
+    UV_OK
+  except CatchableError, Defect:
+    UV_ERR_FORMAT
+
+proc uv_prepared_path_tolerance(h: pointer): float32 =
+  if h == nil: return 0'f32
+  try:
+    preparedPathOf(h).path.tolerance
+  except CatchableError, Defect:
+    0'f32
+
+proc uv_prepared_path_free(h: pointer) =
+  if h == nil: return
+  swallowAbiFaults:
+    GC_unref(preparedPathOf(h))
 
 proc uv_path_parse_d(s: cstring; outHandle: ptr pointer): cint =
   ## Parse an SVG `d` string. On success stores a handle in `*outHandle` (free

@@ -18,6 +18,12 @@ const
   MaxFlattenDepth* = 18 ## subdivision cap before a span is forced flat (stack guard).
   MaxFlattenSegments* = 1_048_576 ## hard output cap for untrusted paths.
 
+type
+  FlattenContour* = object
+    ## Segment range and closure state for one flattened subpath.
+    first*, count*: int
+    closed*: bool
+
 proc addSegment(segments: var seq[Segment]; segment: Segment) {.inline.} =
   if segments.len >= MaxFlattenSegments:
     raise newException(ValueError, "flatten: segment limit exceeded")
@@ -186,7 +192,8 @@ proc arcToSegments(segments: var seq[Segment]; at, to: Vec2; r: Vec2;
     segments.addSegment(Segment(at: prev, to: vec2(px, py)))
     prev = vec2(px, py)
 
-proc flattenImpl(path: Path; tol: float32): seq[Segment] =
+proc flattenImpl(path: Path; tol: float32;
+                 contours: ptr seq[FlattenContour] = nil): seq[Segment] =
   ## Flatten `path` to directed line segments. Smooth shorthands (S/T) reflect
   ## the previous cubic/quad control; when the previous command was not the
   ## matching kind the control coincides with the current point (per SVG).
@@ -197,13 +204,23 @@ proc flattenImpl(path: Path; tol: float32): seq[Segment] =
     prevQuadC = vec2(0'f32, 0'f32)
     prevWasCubic = false
     prevWasQuad = false
+    contourFirst = 0
+    contourClosed = false
+  template finishContour() =
+    if contours != nil and result.len > contourFirst:
+      contours[].add(FlattenContour(first: contourFirst,
+          count: result.len - contourFirst, closed: contourClosed))
+    contourFirst = result.len
+    contourClosed = false
   for cmd in path.commands:
     case cmd.kind
     of pMove:
+      finishContour()
       at = cmd.p; start = cmd.p
       prevWasCubic = false; prevWasQuad = false
 
     of pRMove:
+      finishContour()
       at = at + cmd.p; start = at
       prevWasCubic = false; prevWasQuad = false
     of pLine:
@@ -283,7 +300,19 @@ proc flattenImpl(path: Path; tol: float32): seq[Segment] =
       if at.x != start.x or at.y != start.y:
         result.addSegment(Segment(at: at, to: start))
       at = start
+      contourClosed = true
       prevWasCubic = false; prevWasQuad = false
+  finishContour()
+
+proc flattenWithContours*(path: Path; tol: float32;
+                          contours: var seq[FlattenContour]): seq[
+    Segment] {.contractual.} =
+  ## Flatten a path while retaining its explicit subpath boundaries.
+  require:
+    tol > 0'f32
+  body:
+    contours.setLen(0)
+    flattenImpl(path, tol, addr contours)
 
 proc flatten*(path: Path; tol = FlattenTolerance): seq[
     Segment] {.contractual.} =
