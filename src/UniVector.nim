@@ -10,6 +10,7 @@
 ## and SVG output.
 import UniVector/common
 import UniVector/path
+import UniVector/marker
 import UniVector/flatten
 import UniVector/prepared
 import UniVector/stroke
@@ -18,6 +19,7 @@ import UniVector/raster
 import UniVector/svg
 export common
 export path
+export marker
 export flatten
 export prepared
 export stroke
