@@ -158,6 +158,31 @@ def test_prepared_path_stroke_caps_and_validation():
         p.prepare().stroke(0)
 
 
+def test_prepared_path_dashed_stroke_and_mesh():
+    prepared = univector.Path.parse_d("M 0 0 L 10 0").prepare()
+    outline = prepared.stroke(2, dashes=[2, 2], dash_offset=1)
+    assert len(outline.commands) == 15
+    mesh = prepared.tessellate_stroke(2, dashes=[2, 2])
+    assert mesh.triangle_count > 0
+    with pytest.raises(ValueError):
+        prepared.stroke(2, dashes=[1, 0])
+
+
+def test_marker_paths_support_fixed_and_variable_sizes():
+    marker = univector.marker_path(univector.MARKER_DIAMOND, (2, 3), 4)
+    assert marker.bounds() == pytest.approx((0, 1, 4, 4))
+    markers = univector.markers_path(
+        univector.MARKER_SQUARE, [(2, 2), (8, 8)], 2)
+    assert markers.bounds() == pytest.approx((1, 1, 8, 8))
+    sized = univector.markers_path_sized(
+        univector.MARKER_CIRCLE, [(2, 2), (8, 8)], [2, 4])
+    assert sized.bounds(0.05) == pytest.approx((1, 1, 9, 9), abs=0.01)
+    with pytest.raises(ValueError):
+        univector.marker_path(999, (0, 0), 2)
+    with pytest.raises(ValueError):
+        univector.markers_path_sized(univector.MARKER_CIRCLE, [(0, 0)], [])
+
+
 def test_fill_mesh_is_indexed_and_immutable():
     p = univector.Path()
     p.rect(0, 0, 4, 4)

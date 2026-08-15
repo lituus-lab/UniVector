@@ -74,6 +74,7 @@ print(prepared.bounds)
 print(prepared.segments)  # immutable tuple snapshot
 outline = prepared.stroke(2, cap=univector.CAP_ROUND,
                           join=univector.JOIN_BEVEL)
+dashed = prepared.stroke(2, dashes=[6, 3], dash_offset=1)
 mesh = prepared.tessellate_fill(univector.WINDING_NON_ZERO)
 stroke_mesh = prepared.tessellate_stroke(2, cap=univector.CAP_ROUND)
 print(mesh.triangle_count, mesh.vertices, mesh.indices)
@@ -82,6 +83,20 @@ print(mesh.triangle_count, mesh.vertices, mesh.indices)
 The tolerance is the subdivision threshold used against each curve span. A
 smaller value produces more segments and generally smoother edges at a higher cost.
 Passing `0.0` selects `FLATTEN_TOLERANCE`.
+
+## Plot markers
+
+```python
+diamond = univector.marker_path(univector.MARKER_DIAMOND, (24, 16), 8)
+squares = univector.markers_path(
+    univector.MARKER_SQUARE, [(8, 8), (16, 12), (24, 10)], 5)
+circles = univector.markers_path_sized(
+    univector.MARKER_CIRCLE, [(8, 8), (16, 12), (24, 10)], [3, 5, 7])
+```
+
+Marker size is the full width and height. Available shapes are circle, square,
+triangle, diamond, plus, and cross. Batch constructors return one fill-ready
+`Path`; the sized variant requires one strictly positive size per point.
 
 ## Geometry helpers
 
@@ -111,13 +126,16 @@ parameters.
   and `encode_png`.
 - `Color`: `parse`, `rgba`, and `to_svg`.
 - Geometry: `quad_point`, `cubic_point`, and `compute_bounds`.
+- Plot geometry: `marker_path`, `markers_path`, `markers_path_sized`, and the
+  `MARKER_*` constants. `PreparedPath.stroke` and `tessellate_stroke` accept
+  `dashes` and `dash_offset`.
 - Command metadata: `is_relative`, `parameter_count`, and `PATH_*` constants.
 - Rendering constants: `WINDING_NON_ZERO`, `WINDING_EVEN_ODD`,
   `BLEND_NORMAL`, `BLEND_OVERWRITE`, `GEOMETRIC_EPSILON`,
   `CAP_BUTT`, `CAP_ROUND`, `CAP_SQUARE`, `JOIN_MITER`, `JOIN_ROUND`,
   `JOIN_BEVEL`, `DEFAULT_MITER_LIMIT`,
-  `FLATTEN_TOLERANCE`, `MAX_FLATTEN_DEPTH`, `MAX_FLATTEN_SEGMENTS`, and
-  `SUPERSAMPLE`.
+  `FLATTEN_TOLERANCE`, `MAX_FLATTEN_DEPTH`, `MAX_FLATTEN_SEGMENTS`,
+  `MAX_DASH_PATTERN_ELEMENTS`, `MAX_MARKER_COUNT`, and `SUPERSAMPLE`.
 - Runtime: `version`, `abi_version`, and `strerror`.
 
 ## Errors and lifetime
