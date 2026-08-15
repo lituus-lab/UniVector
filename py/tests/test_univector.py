@@ -129,6 +129,17 @@ def test_path_state_commands_flatten_and_bounds():
     assert p.bounds() == pytest.approx((1, 2, 3, 4))
 
 
+def test_prepared_path_is_an_immutable_snapshot():
+    p = univector.Path()
+    p.rect(1, 2, 3, 4)
+    prepared = p.prepare(0.25)
+    p.line_to(20, 20)
+    assert len(prepared) == 4
+    assert prepared.tolerance == pytest.approx(0.25)
+    assert prepared.bounds == pytest.approx((1, 2, 3, 4))
+    assert isinstance(prepared.segments, tuple)
+
+
 def test_geometry_helpers_and_command_metadata():
     assert univector.BLEND_NORMAL == 0
     assert univector.BLEND_OVERWRITE == 1

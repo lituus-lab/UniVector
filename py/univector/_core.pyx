@@ -21,6 +21,7 @@ cdef extern from "UniVector.h":
     const char *uv_strerror(int code)
 
     ctypedef void* uv_path
+    ctypedef void* uv_prepared_path
     ctypedef void* uv_image
     ctypedef void* uv_color
 
@@ -84,6 +85,13 @@ cdef extern from "UniVector.h":
                              size_t* out_count)
     int      uv_segments_bounds(const uv_segment* segments, size_t count,
                                 uv_rect* out_bounds)
+    uv_prepared_path uv_path_prepare(uv_path h, float tolerance)
+    size_t   uv_prepared_path_segment_count(uv_prepared_path h)
+    int      uv_prepared_path_segment_get(uv_prepared_path h, size_t index,
+                                          uv_segment* out_segment)
+    int      uv_prepared_path_bounds(uv_prepared_path h, uv_rect* out_bounds)
+    float    uv_prepared_path_tolerance(uv_prepared_path h)
+    void     uv_prepared_path_free(uv_prepared_path h)
 
     uv_image uv_image_new(int width, int height)
     int      uv_image_width(uv_image h)
@@ -387,6 +395,13 @@ cdef class Path:
     def bounds(self, float tolerance=0.0):
         return compute_bounds(self.flatten(tolerance))
 
+    def prepare(self, float tolerance=0.0):
+        """Flatten once into immutable renderer-neutral geometry."""
+        cdef uv_prepared_path h = uv_path_prepare(self._h, tolerance)
+        if h == NULL:
+            raise ValueError("prepare failed")
+        return PreparedPath._wrap(h)
+
     @staticmethod
     def parse_d(str s):
         """Parse an SVG `d` string. Raises ValueError on a bad string."""
@@ -421,6 +436,55 @@ cdef class Path:
         finally:
             uv_buffer_free(out, out_len)
 
+
+cdef class PreparedPath:
+    """Immutable flattened path geometry owned by UniVector."""
+    cdef uv_prepared_path _h
+
+    def __cinit__(self):
+        self._h = NULL
+
+    def __dealloc__(self):
+        if self._h != NULL:
+            uv_prepared_path_free(self._h)
+            self._h = NULL
+
+    @staticmethod
+    cdef PreparedPath _wrap(uv_prepared_path h):
+        cdef PreparedPath result = PreparedPath.__new__(PreparedPath)
+        result._h = h
+        return result
+
+    def __init__(self):
+        raise TypeError("PreparedPath values are created by Path.prepare()")
+
+    def __len__(self):
+        return uv_prepared_path_segment_count(self._h)
+
+    @property
+    def tolerance(self):
+        return uv_prepared_path_tolerance(self._h)
+
+    @property
+    def bounds(self):
+        cdef uv_rect out
+        cdef int rc = uv_prepared_path_bounds(self._h, &out)
+        if rc != 0:
+            raise ValueError(f"prepared bounds failed: {strerror(rc)}")
+        return (out.x, out.y, out.w, out.h)
+
+    @property
+    def segments(self):
+        cdef size_t count = uv_prepared_path_segment_count(self._h)
+        cdef size_t i
+        cdef uv_segment segment
+        result = []
+        for i in range(count):
+            if uv_prepared_path_segment_get(self._h, i, &segment) != 0:
+                raise RuntimeError("prepared path changed while reading")
+            result.append(((segment.at.x, segment.at.y),
+                           (segment.to.x, segment.to.y)))
+        return tuple(result)
 
 cdef class Image:
     """An RGBA8 raster surface. The library owns the handle; freed on GC."""

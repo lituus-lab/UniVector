@@ -114,6 +114,25 @@ The bounds are computed from the flattened segments. They are therefore bounds
 of that polyline approximation; reducing the tolerance makes them converge
 toward the curve's bounds.
 
+## Preparing geometry once
+
+Repeated drawing should not flatten the same curves in every backend. A
+`PreparedPath` stores the segments, tolerance, and bounds as an immutable
+snapshot:
+"""
+
+nbCode:
+  let preparedCurve = curve.preparePath(0.25'f32)
+  doAssert preparedCurve.len == fine.len
+  doAssert preparedCurve.bounds == computeBounds(fine)
+  echo "prepared segments = ", preparedCurve.len
+  echo "prepared tolerance = ", preparedCurve.tolerance
+
+nbText: """
+The snapshot remains valid if the source `Path` is later extended. C callers
+own an opaque `uv_prepared_path`; Python callers use `Path.prepare()` and read
+the `PreparedPath.segments`, `bounds`, and `tolerance` properties.
+
 ## Filling: crossings and winding
 
 For each sampled scanline, UniVector finds where path edges cross it and sorts

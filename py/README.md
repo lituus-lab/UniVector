@@ -65,6 +65,10 @@ print(path.current)       # (10.0, 10.0), because Z closes the subpath
 print(path.commands)      # [(kind, parameters), ...]
 print(path.flatten(0.25)) # [((x0, y0), (x1, y1)), ...]
 print(path.bounds(0.25))  # (x, y, width, height)
+
+prepared = path.prepare(0.25)
+print(prepared.bounds)
+print(prepared.segments)  # immutable tuple snapshot
 ```
 
 The tolerance is the subdivision threshold used against each curve span. A
@@ -91,7 +95,8 @@ parameters.
 - `Path`: `move_to`, `line_to`, `bezier_curve_to`, `quadratic_curve_to`,
   `elliptical_arc_to`, `arc`, `arc_to`, `rect`, `rounded_rect`, `ellipse`,
   `circle`, `polygon`, `close_path`, `add_path`, `copy`, `parse_d`, `to_d`,
-  `to_svg`, `flatten`, `bounds`, `current`, `start`, and `commands`.
+  `to_svg`, `flatten`, `prepare`, `bounds`, `current`, `start`, and `commands`.
+- `PreparedPath`: `segments`, `bounds`, `tolerance`, and `len`.
 - `Image`: `width`, `height`, `channels`, `pixels`, `fill`, and `encode_png`.
 - `Color`: `parse`, `rgba`, and `to_svg`.
 - Geometry: `quad_point`, `cubic_point`, and `compute_bounds`.

@@ -11,7 +11,8 @@
  *   - Call uv_init() before any other function. Repeated calls are harmless;
  *     externally synchronise the first call.
  *   - Handles are opaque. The library owns them; release with the matching
- *     uv_path_free / uv_image_free / uv_color_free (NULL is a no-op).
+ *     uv_path_free / uv_prepared_path_free / uv_image_free / uv_color_free
+ *     (NULL is a no-op).
  *   - uv_path_to_d / uv_path_to_svg / uv_color_to_svg / uv_image_encode_png
  *     allocate a buffer the caller frees with uv_buffer_free. uv_image_pixels
  *     *borrows* the image buffer (valid until uv_image_free) and must NOT be
@@ -116,6 +117,7 @@ typedef struct {
 
 /* Opaque handles. */
 typedef struct uv_path_handle* uv_path;
+typedef struct uv_prepared_path_handle* uv_prepared_path;
 typedef struct uv_image_handle* uv_image;
 typedef struct uv_color_handle* uv_color;
 
@@ -180,6 +182,16 @@ int     uv_path_flatten(uv_path h, float tolerance, uv_segment* out_segments,
                         size_t capacity, size_t* out_count);
 int     uv_segments_bounds(const uv_segment* segments, size_t count,
                            uv_rect* out_bounds);
+
+/* --- prepared path --- */
+/* Flatten once for reuse. tolerance <= 0 selects the default. */
+uv_prepared_path uv_path_prepare(uv_path h, float tolerance);
+size_t  uv_prepared_path_segment_count(uv_prepared_path h);
+int     uv_prepared_path_segment_get(uv_prepared_path h, size_t index,
+                                     uv_segment* out_segment);
+int     uv_prepared_path_bounds(uv_prepared_path h, uv_rect* out_bounds);
+float   uv_prepared_path_tolerance(uv_prepared_path h);
+void    uv_prepared_path_free(uv_prepared_path h);
 
 /* --- image --- */
 /* A zeroed (transparent) RGBA8 image. NULL on bad dimensions or allocation

@@ -16,6 +16,7 @@ Every public UniVector operation is reachable from C and Python:
 | path state and commands | `uv_path_current/start/command_*` | `Path.current/start/commands` |
 | `quadPoint`, `cubicPoint` | `uv_quad_point`, `uv_cubic_point` | `quad_point`, `cubic_point` |
 | `flatten`, `computeBounds` | `uv_path_flatten`, `uv_segments_bounds` | `Path.flatten/bounds`, `compute_bounds` |
+| `preparePath`, prepared accessors | `uv_path_prepare`, `uv_prepared_path_*` | `Path.prepare`, `PreparedPath` |
 | `fillPath` | `uv_fill_path` | `Image.fill` |
 | `toSvgColor`, `toSvgString` | `uv_color_to_svg`, `uv_path_to_svg` | `Color.to_svg`, `Path.to_svg` |
 
