@@ -72,6 +72,7 @@ print(prepared.segments)  # immutable tuple snapshot
 outline = prepared.stroke(2, cap=univector.CAP_ROUND,
                           join=univector.JOIN_BEVEL)
 mesh = prepared.tessellate_fill(univector.WINDING_NON_ZERO)
+stroke_mesh = prepared.tessellate_stroke(2, cap=univector.CAP_ROUND)
 print(mesh.triangle_count, mesh.vertices, mesh.indices)
 ```
 
@@ -101,7 +102,7 @@ parameters.
   `circle`, `polygon`, `close_path`, `add_path`, `copy`, `parse_d`, `to_d`,
   `to_svg`, `flatten`, `prepare`, `bounds`, `current`, `start`, and `commands`.
 - `PreparedPath`: `segments`, `bounds`, `tolerance`, `stroke`,
-  `tessellate_fill`, and `len`.
+  `tessellate_fill`, `tessellate_stroke`, and `len`.
 - `VectorMesh`: `vertices`, `indices`, and `triangle_count`.
 - `Image`: `width`, `height`, `channels`, `pixels`, `fill`, and `encode_png`.
 - `Color`: `parse`, `rgba`, and `to_svg`.

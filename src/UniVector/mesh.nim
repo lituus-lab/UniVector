@@ -5,6 +5,7 @@ import std/[algorithm, math]
 import contracts
 import UniVector/common
 import UniVector/prepared
+import UniVector/stroke
 
 const
   MaxMeshVertices* = 4_194_304
@@ -144,3 +145,12 @@ proc tessellateFill*(prepared: PreparedPath;
     result.indexCount <= MaxMeshIndices
   body:
     tessellateFillImpl(prepared, windingRule)
+
+proc tessellateStroke*(prepared: PreparedPath;
+                       style: StrokeStyle): VectorMesh {.contractual.} =
+  ## Expand and tessellate a prepared centerline with NonZero winding.
+  ensure:
+    result.indexCount mod 3 == 0
+  body:
+    prepared.strokeToPath(style).preparePath(prepared.tolerance)
+      .tessellateFill(NonZero)

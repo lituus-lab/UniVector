@@ -71,3 +71,22 @@ suite "fill tessellation":
       area += abs((b.x - a.x) * (c.y - a.y) -
           (b.y - a.y) * (c.x - a.x)) * 0.5'f32
     check abs(area - 50'f32) < 0.001'f32
+
+suite "stroke tessellation":
+  test "line stroke produces indexed triangles":
+    let prepared = parsePath("M 2 4 L 8 4").preparePath()
+    let mesh = prepared.tessellateStroke(defaultStrokeStyle(2'f32))
+    check mesh.triangleCount == 2
+    check mesh.vertexCount == 4
+
+  test "round caps expand the mesh bounds":
+    let prepared = parsePath("M 2 4 L 8 4").preparePath(0.1'f32)
+    let mesh = prepared.tessellateStroke(StrokeStyle(width: 2,
+        cap: RoundCap, join: RoundJoin, miterLimit: 4))
+    var minX = mesh.vertex(0).position.x
+    var maxX = minX
+    for vertex in mesh.vertices:
+      minX = min(minX, vertex.position.x)
+      maxX = max(maxX, vertex.position.x)
+    check abs(minX - 1'f32) < 0.001'f32
+    check abs(maxX - 9'f32) < 0.001'f32

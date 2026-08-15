@@ -159,6 +159,14 @@ def test_fill_mesh_is_indexed_and_immutable():
     assert isinstance(mesh.vertices, tuple)
 
 
+def test_stroke_mesh_uses_the_same_style_contract():
+    prepared = univector.Path.parse_d("M 2 4 L 8 4").prepare()
+    mesh = prepared.tessellate_stroke(2, cap=univector.CAP_ROUND)
+    assert mesh.triangle_count > 2
+    with pytest.raises(ValueError):
+        prepared.tessellate_stroke(-1)
+
+
 def test_geometry_helpers_and_command_metadata():
     assert univector.BLEND_NORMAL == 0
     assert univector.BLEND_OVERWRITE == 1

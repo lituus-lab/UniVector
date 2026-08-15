@@ -514,6 +514,19 @@ proc uv_prepared_path_tessellate_fill(h: pointer; winding: cint): pointer =
   except CatchableError, Defect:
     nil
 
+proc uv_prepared_path_tessellate_stroke(h: pointer; width: float32;
+    cap, join: cint; miterLimit: float32): pointer =
+  var style: StrokeStyle
+  if h == nil or not toStrokeStyle(width, cap, join, miterLimit, style):
+    return nil
+  try:
+    let handle = MeshHandle(
+        mesh: preparedPathOf(h).path.tessellateStroke(style))
+    GC_ref(handle)
+    cast[pointer](handle)
+  except CatchableError, Defect:
+    nil
+
 proc uv_mesh_vertex_count(h: pointer): csize_t =
   if h == nil: return 0
   try: csize_t(meshOf(h).mesh.vertexCount)

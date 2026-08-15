@@ -100,6 +100,12 @@ int main(void) {
   assert(uv_mesh_index_get(mesh, 0, &mesh_index) == UV_OK);
   assert(mesh_index < uv_mesh_vertex_count(mesh));
   uv_mesh_free(mesh);
+  uv_mesh stroke_mesh = uv_prepared_path_tessellate_stroke(
+      prepared, 2.0f, UV_CAP_BUTT, UV_JOIN_MITER,
+      UNIVECTOR_DEFAULT_MITER_LIMIT);
+  assert(stroke_mesh != NULL);
+  assert(uv_mesh_index_count(stroke_mesh) > 0);
+  uv_mesh_free(stroke_mesh);
   uv_prepared_path_free(prepared);
 
   uv_vec2 midpoint = {0};
