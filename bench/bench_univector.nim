@@ -32,6 +32,26 @@ measure "stroke expansion x1000":
   for _ in 0 ..< Iterations:
     discard prepared.strokeToPath(defaultStrokeStyle(2'f32))
 
+var dashedStyle = defaultStrokeStyle(2'f32)
+dashedStyle.dash = dashPattern([6'f32, 3'f32])
+measure "dashed stroke expansion x1000":
+  for _ in 0 ..< Iterations:
+    discard prepared.strokeToPath(dashedStyle)
+
+var markerPoints = newSeq[Vec2](1_000)
+var markerSizes = newSeq[float32](1_000)
+for i in 0 ..< markerPoints.len:
+  markerPoints[i] = vec2(float32(i mod 100), float32(i div 100))
+  markerSizes[i] = float32(2 + i mod 5)
+
+measure "1000 fixed markers x100":
+  for _ in 0 ..< 100:
+    discard placeMarkers(CircleMarker, markerPoints, 4'f32)
+
+measure "1000 sized markers x100":
+  for _ in 0 ..< 100:
+    discard placeMarkers(DiamondMarker, markerPoints, markerSizes)
+
 measure "tessellate fill x1000":
   for _ in 0 ..< Iterations:
     discard prepared.tessellateFill()
