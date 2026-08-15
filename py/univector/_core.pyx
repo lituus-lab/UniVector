@@ -13,6 +13,8 @@ cdef extern from "UniVector.h":
     float  UNIVECTOR_FLATTEN_TOLERANCE
     int    UNIVECTOR_MAX_FLATTEN_DEPTH
     int    UNIVECTOR_MAX_FLATTEN_SEGMENTS
+    int    UNIVECTOR_MAX_DASH_PATTERN_ELEMENTS
+    int    UNIVECTOR_MAX_MARKER_COUNT
     int    UNIVECTOR_SUPERSAMPLE
     int    UNIVECTOR_MAX_MESH_VERTICES
     int    UNIVECTOR_MAX_MESH_INDICES
@@ -101,9 +103,20 @@ cdef extern from "UniVector.h":
     void     uv_prepared_path_free(uv_prepared_path h)
     uv_path  uv_prepared_path_stroke(uv_prepared_path h, float width,
                                      int cap, int join, float miter_limit)
+    uv_path  uv_prepared_path_stroke_dashed(
+        uv_prepared_path h, float width, int cap, int join, float miter_limit,
+        const float* dashes, size_t dash_count, float dash_offset)
+    uv_path  uv_marker_path(int shape, uv_vec2 center, float size)
+    uv_path  uv_markers_path(int shape, const uv_vec2* points,
+                             size_t count, float size)
+    uv_path  uv_markers_path_sized(int shape, const uv_vec2* points,
+                                   const float* sizes, size_t count)
     uv_mesh  uv_prepared_path_tessellate_fill(uv_prepared_path h, int winding)
     uv_mesh  uv_prepared_path_tessellate_stroke(
         uv_prepared_path h, float width, int cap, int join, float miter_limit)
+    uv_mesh  uv_prepared_path_tessellate_stroke_dashed(
+        uv_prepared_path h, float width, int cap, int join, float miter_limit,
+        const float* dashes, size_t dash_count, float dash_offset)
     size_t   uv_mesh_vertex_count(uv_mesh h)
     size_t   uv_mesh_index_count(uv_mesh h)
     int      uv_mesh_vertex_get(uv_mesh h, size_t index,
@@ -141,6 +154,8 @@ WINDING_EVEN_ODD = 1
 FLATTEN_TOLERANCE = UNIVECTOR_FLATTEN_TOLERANCE
 MAX_FLATTEN_DEPTH = UNIVECTOR_MAX_FLATTEN_DEPTH
 MAX_FLATTEN_SEGMENTS = UNIVECTOR_MAX_FLATTEN_SEGMENTS
+MAX_DASH_PATTERN_ELEMENTS = UNIVECTOR_MAX_DASH_PATTERN_ELEMENTS
+MAX_MARKER_COUNT = UNIVECTOR_MAX_MARKER_COUNT
 MAX_MESH_VERTICES = UNIVECTOR_MAX_MESH_VERTICES
 MAX_MESH_INDICES = UNIVECTOR_MAX_MESH_INDICES
 SUPERSAMPLE = UNIVECTOR_SUPERSAMPLE
@@ -154,6 +169,12 @@ JOIN_MITER = 0
 JOIN_ROUND = 1
 JOIN_BEVEL = 2
 DEFAULT_MITER_LIMIT = UNIVECTOR_DEFAULT_MITER_LIMIT
+MARKER_CIRCLE = 0
+MARKER_SQUARE = 1
+MARKER_TRIANGLE = 2
+MARKER_DIAMOND = 3
+MARKER_PLUS = 4
+MARKER_CROSS = 5
 
 PATH_CLOSE = 0
 PATH_MOVE = 1
@@ -467,6 +488,71 @@ cdef class Path:
             uv_buffer_free(out, out_len)
 
 
+def marker_path(int shape, center, float size):
+    """Construct one filled marker path."""
+    cdef uv_path h = uv_marker_path(shape, _vec2(center), size)
+    if h == NULL:
+        raise ValueError("marker_path failed")
+    return Path._wrap(h)
+
+
+def markers_path(int shape, points, float size):
+    """Combine equally sized markers into one filled path."""
+    values = list(points)
+    cdef size_t count = len(values)
+    cdef uv_vec2* raw = NULL
+    cdef size_t i
+    cdef uv_path h = NULL
+    if count > MAX_MARKER_COUNT:
+        raise ValueError("marker limit exceeded")
+    if count:
+        raw = <uv_vec2*>malloc(count * sizeof(uv_vec2))
+        if raw == NULL:
+            raise MemoryError()
+    try:
+        for i in range(count):
+            raw[i] = _vec2(values[i])
+        h = uv_markers_path(shape, raw, count, size)
+        if h == NULL:
+            raise ValueError("markers_path failed")
+        return Path._wrap(h)
+    finally:
+        free(raw)
+
+
+def markers_path_sized(int shape, points, sizes):
+    """Combine per-point sized markers into one filled path."""
+    point_values = list(points)
+    size_values = list(sizes)
+    if len(point_values) != len(size_values):
+        raise ValueError("point and size counts differ")
+    cdef size_t count = len(point_values)
+    cdef uv_vec2* raw_points = NULL
+    cdef float* raw_sizes = NULL
+    cdef size_t i
+    cdef uv_path h = NULL
+    if count > MAX_MARKER_COUNT:
+        raise ValueError("marker limit exceeded")
+    if count:
+        raw_points = <uv_vec2*>malloc(count * sizeof(uv_vec2))
+        raw_sizes = <float*>malloc(count * sizeof(float))
+        if raw_points == NULL or raw_sizes == NULL:
+            free(raw_points)
+            free(raw_sizes)
+            raise MemoryError()
+    try:
+        for i in range(count):
+            raw_points[i] = _vec2(point_values[i])
+            raw_sizes[i] = float(size_values[i])
+        h = uv_markers_path_sized(shape, raw_points, raw_sizes, count)
+        if h == NULL:
+            raise ValueError("markers_path_sized failed")
+        return Path._wrap(h)
+    finally:
+        free(raw_points)
+        free(raw_sizes)
+
+
 cdef class PreparedPath:
     """Immutable flattened path geometry owned by UniVector."""
     cdef uv_prepared_path _h
@@ -517,10 +603,33 @@ cdef class PreparedPath:
         return tuple(result)
 
     def stroke(self, float width, int cap=CAP_BUTT, int join=JOIN_MITER,
-               float miter_limit=DEFAULT_MITER_LIMIT):
+               float miter_limit=DEFAULT_MITER_LIMIT, dashes=None,
+               float dash_offset=0.0):
         """Expand this centerline into a filled Path."""
-        cdef uv_path h = uv_prepared_path_stroke(
-            self._h, width, cap, join, miter_limit)
+        cdef uv_path h = NULL
+        cdef float* raw = NULL
+        cdef size_t count = 0
+        cdef size_t i
+        if dashes is None:
+            h = uv_prepared_path_stroke(
+                self._h, width, cap, join, miter_limit)
+        else:
+            values = list(dashes)
+            count = len(values)
+            if count > MAX_DASH_PATTERN_ELEMENTS:
+                raise ValueError("dash pattern limit exceeded")
+            if count:
+                raw = <float*>malloc(count * sizeof(float))
+                if raw == NULL:
+                    raise MemoryError()
+            try:
+                for i in range(count):
+                    raw[i] = float(values[i])
+                h = uv_prepared_path_stroke_dashed(
+                    self._h, width, cap, join, miter_limit, raw, count,
+                    dash_offset)
+            finally:
+                free(raw)
         if h == NULL:
             raise ValueError("stroke failed: invalid style or allocation")
         return Path._wrap(h)
@@ -534,10 +643,33 @@ cdef class PreparedPath:
 
     def tessellate_stroke(self, float width, int cap=CAP_BUTT,
                           int join=JOIN_MITER,
-                          float miter_limit=DEFAULT_MITER_LIMIT):
+                          float miter_limit=DEFAULT_MITER_LIMIT, dashes=None,
+                          float dash_offset=0.0):
         """Expand and build an indexed triangle mesh for this stroke."""
-        cdef uv_mesh h = uv_prepared_path_tessellate_stroke(
-            self._h, width, cap, join, miter_limit)
+        cdef uv_mesh h = NULL
+        cdef float* raw = NULL
+        cdef size_t count = 0
+        cdef size_t i
+        if dashes is None:
+            h = uv_prepared_path_tessellate_stroke(
+                self._h, width, cap, join, miter_limit)
+        else:
+            values = list(dashes)
+            count = len(values)
+            if count > MAX_DASH_PATTERN_ELEMENTS:
+                raise ValueError("dash pattern limit exceeded")
+            if count:
+                raw = <float*>malloc(count * sizeof(float))
+                if raw == NULL:
+                    raise MemoryError()
+            try:
+                for i in range(count):
+                    raw[i] = float(values[i])
+                h = uv_prepared_path_tessellate_stroke_dashed(
+                    self._h, width, cap, join, miter_limit, raw, count,
+                    dash_offset)
+            finally:
+                free(raw)
         if h == NULL:
             raise ValueError("tessellate_stroke failed")
         return VectorMesh._wrap(h)
