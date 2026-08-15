@@ -145,6 +145,26 @@ proc toStrokeStyle(width: float32; cap, join: cint; miterLimit: float32;
       miterLimit: miterLimit)
   true
 
+proc toDashedStrokeStyle(width: float32; cap, join: cint; miterLimit: float32;
+                         dashes: ptr float32; dashCount: csize_t;
+                         dashOffset: float32; style: var StrokeStyle): bool =
+  if not toStrokeStyle(width, cap, join, miterLimit, style) or
+      dashCount > csize_t(MaxDashPatternElements) or
+      (dashCount > 0 and dashes == nil) or not allFinite([dashOffset]):
+    return false
+  try:
+    var values = newSeq[float32](int(dashCount))
+    let input = cast[ptr UncheckedArray[float32]](dashes)
+    for i in 0 ..< values.len:
+      values[i] = input[i]
+    style.dash = dashPattern(values, dashOffset)
+    true
+  except CatchableError, Defect:
+    false
+
+proc isValidMarkerShape(shape: cint): bool {.inline.} =
+  shape >= cint(low(MarkerShape).ord) and shape <= cint(high(MarkerShape).ord)
+
 proc writeString(s: string; outStr: ptr ptr char; outLen: ptr csize_t): cint =
   ## Copy `s` into a C-owned, NUL-terminated buffer; caller frees with
   ## `uv_buffer_free`. `*outLen` is the string length (excludes the NUL).
@@ -501,6 +521,70 @@ proc uv_prepared_path_stroke(h: pointer; width: float32; cap, join: cint;
   except CatchableError, Defect:
     nil
 
+proc uv_prepared_path_stroke_dashed(h: pointer; width: float32; cap, join: cint;
+    miterLimit: float32; dashes: ptr float32; dashCount: csize_t;
+    dashOffset: float32): pointer =
+  var style: StrokeStyle
+  if h == nil or not toDashedStrokeStyle(width, cap, join, miterLimit,
+      dashes, dashCount, dashOffset, style):
+    return nil
+  try:
+    let path = PathHandle(path: preparedPathOf(h).path.strokeToPath(style))
+    GC_ref(path)
+    cast[pointer](path)
+  except CatchableError, Defect:
+    nil
+
+proc uv_marker_path(shape: cint; center: UvVec2; size: float32): pointer =
+  if not shape.isValidMarkerShape or
+      not allFinite([center.x, center.y, size]) or size <= 0'f32:
+    return nil
+  try:
+    let handle = PathHandle(path: markerPath(MarkerShape(shape),
+        center.fromC, size))
+    GC_ref(handle)
+    cast[pointer](handle)
+  except CatchableError, Defect:
+    nil
+
+proc uv_markers_path(shape: cint; points: ptr UvVec2; count: csize_t;
+                     size: float32): pointer =
+  if not shape.isValidMarkerShape or count > csize_t(MaxMarkerCount) or
+      (count > 0 and points == nil) or not allFinite([size]) or size <= 0'f32:
+    return nil
+  try:
+    var values = newSeq[Vec2](int(count))
+    let input = cast[ptr UncheckedArray[UvVec2]](points)
+    for i in 0 ..< values.len:
+      values[i] = input[i].fromC
+    let handle = PathHandle(path: placeMarkers(MarkerShape(shape), values, size))
+    GC_ref(handle)
+    cast[pointer](handle)
+  except CatchableError, Defect:
+    nil
+
+proc uv_markers_path_sized(shape: cint; points: ptr UvVec2;
+    sizes: ptr float32; count: csize_t): pointer =
+  if not shape.isValidMarkerShape or count > csize_t(MaxMarkerCount) or
+      (count > 0 and (points == nil or sizes == nil)):
+    return nil
+  try:
+    var
+      pointValues = newSeq[Vec2](int(count))
+      sizeValues = newSeq[float32](int(count))
+    let
+      pointInput = cast[ptr UncheckedArray[UvVec2]](points)
+      sizeInput = cast[ptr UncheckedArray[float32]](sizes)
+    for i in 0 ..< pointValues.len:
+      pointValues[i] = pointInput[i].fromC
+      sizeValues[i] = sizeInput[i]
+    let handle = PathHandle(path: placeMarkers(MarkerShape(shape),
+        pointValues, sizeValues))
+    GC_ref(handle)
+    cast[pointer](handle)
+  except CatchableError, Defect:
+    nil
+
 # -------------------------------- mesh --------------------------------------
 
 proc uv_prepared_path_tessellate_fill(h: pointer; winding: cint): pointer =
@@ -518,6 +602,21 @@ proc uv_prepared_path_tessellate_stroke(h: pointer; width: float32;
     cap, join: cint; miterLimit: float32): pointer =
   var style: StrokeStyle
   if h == nil or not toStrokeStyle(width, cap, join, miterLimit, style):
+    return nil
+  try:
+    let handle = MeshHandle(
+        mesh: preparedPathOf(h).path.tessellateStroke(style))
+    GC_ref(handle)
+    cast[pointer](handle)
+  except CatchableError, Defect:
+    nil
+
+proc uv_prepared_path_tessellate_stroke_dashed(h: pointer; width: float32;
+    cap, join: cint; miterLimit: float32; dashes: ptr float32;
+    dashCount: csize_t; dashOffset: float32): pointer =
+  var style: StrokeStyle
+  if h == nil or not toDashedStrokeStyle(width, cap, join, miterLimit,
+      dashes, dashCount, dashOffset, style):
     return nil
   try:
     let handle = MeshHandle(
