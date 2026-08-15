@@ -46,7 +46,10 @@ path.circle(32, 32, 12)
 
 color = univector.Color.parse("oklch(62% 0.17 255)")
 image = univector.Image(64, 64)
-image.fill(path, color, winding=univector.WINDING_EVEN_ODD)
+prepared = path.prepare()
+image.fill_prepared(prepared, color,
+                    winding=univector.WINDING_EVEN_ODD)
+# For one-off rendering, use image.fill(path, color, winding=...) instead.
 
 png_bytes = image.encode_png()
 svg_text = path.to_svg(color, 64, 64)
@@ -104,7 +107,8 @@ parameters.
 - `PreparedPath`: `segments`, `bounds`, `tolerance`, `stroke`,
   `tessellate_fill`, `tessellate_stroke`, and `len`.
 - `VectorMesh`: `vertices`, `indices`, and `triangle_count`.
-- `Image`: `width`, `height`, `channels`, `pixels`, `fill`, and `encode_png`.
+- `Image`: `width`, `height`, `channels`, `pixels`, `fill`, `fill_prepared`,
+  and `encode_png`.
 - `Color`: `parse`, `rgba`, and `to_svg`.
 - Geometry: `quad_point`, `cubic_point`, and `compute_bounds`.
 - Command metadata: `is_relative`, `parameter_count`, and `PATH_*` constants.

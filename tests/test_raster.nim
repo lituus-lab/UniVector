@@ -10,6 +10,15 @@ proc px(img: uimg.Image[uint8]; x, y: int): tuple[r, g, b, a: uint8] =
   (img.data[i], img.data[i + 1], img.data[i + 2], img.data[i + 3])
 
 suite "fillPath solid":
+  test "prepared fill matches path fill exactly":
+    let path = parsePath("M 1 1 C 2 0 6 0 7 1 L 7 7 H 1 Z")
+    let color = parseColor("#3366cc80").get
+    var direct = uimg.newImage[uint8](8, 8, uimg.csRgba)
+    var prepared = uimg.newImage[uint8](8, 8, uimg.csRgba)
+    direct.fillPath(path, color, EvenOdd, 0.25'f32)
+    prepared.fillPreparedPath(path.preparePath(0.25'f32), color, EvenOdd)
+    check prepared.data == direct.data
+
   test "full-cover rect interior is opaque solid color":
     var img = uimg.newImage[uint8](10, 10, uimg.csRgba)
     var p = newPath()

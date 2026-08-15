@@ -93,13 +93,13 @@ Build the format-independent representation before adding document parsers.
 
 ## Rendering and conformance
 
-- [ ] Cache flattened segments and bounds in immutable prepared paths.
+- [x] Cache flattened segments and bounds in immutable prepared paths.
 - [x] Expand strokes with butt, round, and square caps and miter, round, and
   bevel joins.
 - [x] Tessellate fills and strokes into validated renderer-neutral indexed
   triangle meshes.
-- [ ] Expose prepared paths and meshes consistently through Nim, C, and Python.
-- [ ] Benchmark preparation reuse, stroke expansion, fill tessellation, stroke
+- [x] Expose prepared paths and meshes consistently through Nim, C, and Python.
+- [x] Benchmark preparation reuse, stroke expansion, fill tessellation, stroke
   tessellation, and prepared raster filling with deterministic workloads.
 - [ ] Apply transforms before flattening without losing the requested error
   tolerance.

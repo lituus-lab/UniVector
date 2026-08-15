@@ -127,6 +127,8 @@ cdef extern from "UniVector.h":
 
     int      uv_fill_path(uv_image img, uv_path path, uv_color color,
                           int winding, float tol, int blend)
+    int      uv_fill_prepared_path(uv_image img, uv_prepared_path path,
+                                   uv_color color, int winding, int blend)
     int      uv_path_to_svg(uv_path path, uv_color color, int width, int height,
                             char** out_str, size_t* out_len)
     int      uv_color_to_svg(uv_color color, char** out_str, size_t* out_len)
@@ -659,6 +661,15 @@ cdef class Image:
         rc = uv_fill_path(self._h, path._h, color._h, winding, tol, blend)
         if rc != 0:
             raise ValueError(f"fill failed: {strerror(rc)}")
+
+    def fill_prepared(self, PreparedPath path not None, Color color not None,
+                      int winding=WINDING_NON_ZERO,
+                      int blend=BLEND_NORMAL):
+        """Solid-fill prepared geometry without flattening it again."""
+        rc = uv_fill_prepared_path(
+            self._h, path._h, color._h, winding, blend)
+        if rc != 0:
+            raise ValueError(f"fill_prepared failed: {strerror(rc)}")
 
 
 cdef class Color:

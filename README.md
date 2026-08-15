@@ -108,6 +108,8 @@ CPU and GPU renderers; they do not retain or observe later path mutations.
 and miter-limit settings and returns a normal filled path.
 `PreparedPath.tessellate_fill()` and `tessellate_stroke()` produce immutable
 renderer-neutral vertices and triangle indices ready for GPU upload.
+`fillPreparedPath` and Python's `Image.fill_prepared()` reuse the same cached
+segments and bounds in the CPU rasterizer.
 
 ## Uni* family
 

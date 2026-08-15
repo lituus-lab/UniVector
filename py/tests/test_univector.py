@@ -66,6 +66,16 @@ def test_fill_even_odd_red():
     assert px[0:4] == b"\xff\x00\x00\xff"
 
 
+def test_prepared_fill_matches_direct_fill():
+    p = univector.Path.parse_d("M 0 0 H 4 V 4 H 0 Z")
+    color = univector.Color.parse("#3366cc")
+    direct = univector.Image(4, 4)
+    cached = univector.Image(4, 4)
+    direct.fill(p, color)
+    cached.fill_prepared(p.prepare(), color)
+    assert cached.pixels() == direct.pixels()
+
+
 def test_fill_overwrite_replaces_backdrop():
     img = univector.Image(1, 1)
     p = univector.Path()

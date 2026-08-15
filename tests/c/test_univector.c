@@ -124,6 +124,25 @@ int main(void) {
   assert(uv_image_channels(img) == 4);
   assert(uv_fill_path(img, p, col, UV_WINDING_NON_ZERO, 0,
                       UV_BLEND_NORMAL) == UV_OK);
+  uv_image prepared_img = uv_image_new(4, 4);
+  assert(prepared_img != NULL);
+  uv_prepared_path prepared_fill = uv_path_prepare(p, 0.0f);
+  assert(prepared_fill != NULL);
+  assert(uv_fill_prepared_path(prepared_img, prepared_fill, col,
+                               UV_WINDING_NON_ZERO,
+                               UV_BLEND_NORMAL) == UV_OK);
+  unsigned char *prepared_pixels = NULL;
+  size_t prepared_pixels_len = 0;
+  assert(uv_image_pixels(prepared_img, &prepared_pixels,
+                         &prepared_pixels_len) == UV_OK);
+  assert(prepared_pixels_len == 4 * 4 * 4);
+  unsigned char *direct_pixels = NULL;
+  size_t direct_pixels_len = 0;
+  assert(uv_image_pixels(img, &direct_pixels, &direct_pixels_len) == UV_OK);
+  assert(direct_pixels_len == prepared_pixels_len);
+  assert(memcmp(direct_pixels, prepared_pixels, direct_pixels_len) == 0);
+  uv_prepared_path_free(prepared_fill);
+  uv_image_free(prepared_img);
   /* An out-of-range winding is rejected, not silently treated as NonZero. */
   assert(uv_fill_path(img, p, col, 999, 0, UV_BLEND_NORMAL) == UV_ERR_FORMAT);
   assert(uv_fill_path(img, p, col, UV_WINDING_NON_ZERO, 0, 999) ==

@@ -21,6 +21,7 @@ Every public UniVector operation is reachable from C and Python:
 | `tessellateFill`, mesh accessors | `uv_prepared_path_tessellate_fill`, `uv_mesh_*` | `PreparedPath.tessellate_fill`, `VectorMesh` |
 | `tessellateStroke` | `uv_prepared_path_tessellate_stroke` | `PreparedPath.tessellate_stroke` |
 | `fillPath` | `uv_fill_path` | `Image.fill` |
+| `fillPreparedPath` | `uv_fill_prepared_path` | `Image.fill_prepared` |
 | `toSvgColor`, `toSvgString` | `uv_color_to_svg`, `uv_path_to_svg` | `Color.to_svg`, `Path.to_svg` |
 
 `Epsilon`, `FlattenTolerance`, `MaxFlattenDepth`, `MaxFlattenSegments`,
