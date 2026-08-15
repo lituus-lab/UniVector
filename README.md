@@ -104,6 +104,8 @@ complete Python surface.
 Prepared paths flatten once, retain the tolerance and bounds, and expose
 read-only segment snapshots. They are intended for geometry caches shared by
 CPU and GPU renderers; they do not retain or observe later path mutations.
+`PreparedPath.stroke()` expands centerlines with explicit width, cap, join,
+and miter-limit settings and returns a normal filled path.
 
 ## Uni* family
 

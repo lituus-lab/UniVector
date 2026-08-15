@@ -133,6 +133,24 @@ The snapshot remains valid if the source `Path` is later extended. C callers
 own an opaque `uv_prepared_path`; Python callers use `Path.prepare()` and read
 the `PreparedPath.segments`, `bounds`, and `tolerance` properties.
 
+## Expanding strokes
+
+A stroke is expanded into ordinary filled paths before rasterization or
+tessellation. Its style explicitly selects butt, round, or square caps and
+miter, round, or bevel joins:
+"""
+
+nbCode:
+  let outline = preparedCurve.strokeToPath(StrokeStyle(
+      width: 3'f32, cap: RoundCap, join: BevelJoin, miterLimit: 4'f32))
+  doAssert outline.commands.len > 0
+  echo "stroke bounds = ", outline.flatten().computeBounds()
+
+nbText: """
+Miter joins fall back to bevel joins when their length exceeds the configured
+miter limit. The result is a regular `Path`, so all existing fill, SVG, C, and
+Python operations remain applicable.
+
 ## Filling: crossings and winding
 
 For each sampled scanline, UniVector finds where path edges cross it and sorts

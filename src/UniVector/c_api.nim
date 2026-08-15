@@ -121,6 +121,24 @@ const
   UV_WINDING_NON_ZERO = cint(0)
   UV_WINDING_EVEN_ODD = cint(1)
 
+  UV_CAP_BUTT = cint(0)
+  UV_CAP_ROUND = cint(1)
+  UV_CAP_SQUARE = cint(2)
+  UV_JOIN_MITER = cint(0)
+  UV_JOIN_ROUND = cint(1)
+  UV_JOIN_BEVEL = cint(2)
+
+proc toStrokeStyle(width: float32; cap, join: cint; miterLimit: float32;
+                   style: var StrokeStyle): bool =
+  if not allFinite([width, miterLimit]) or width <= 0'f32 or
+      miterLimit < 1'f32 or
+      cap notin [UV_CAP_BUTT, UV_CAP_ROUND, UV_CAP_SQUARE] or
+      join notin [UV_JOIN_MITER, UV_JOIN_ROUND, UV_JOIN_BEVEL]:
+    return false
+  style = StrokeStyle(width: width, cap: LineCap(cap), join: LineJoin(join),
+      miterLimit: miterLimit)
+  true
+
 proc writeString(s: string; outStr: ptr ptr char; outLen: ptr csize_t): cint =
   ## Copy `s` into a C-owned, NUL-terminated buffer; caller frees with
   ## `uv_buffer_free`. `*outLen` is the string length (excludes the NUL).
@@ -464,6 +482,18 @@ proc uv_prepared_path_free(h: pointer) =
   if h == nil: return
   swallowAbiFaults:
     GC_unref(preparedPathOf(h))
+
+proc uv_prepared_path_stroke(h: pointer; width: float32; cap, join: cint;
+    miterLimit: float32): pointer =
+  var style: StrokeStyle
+  if h == nil or not toStrokeStyle(width, cap, join, miterLimit, style):
+    return nil
+  try:
+    let path = PathHandle(path: preparedPathOf(h).path.strokeToPath(style))
+    GC_ref(path)
+    cast[pointer](path)
+  except CatchableError, Defect:
+    nil
 
 proc uv_path_parse_d(s: cstring; outHandle: ptr pointer): cint =
   ## Parse an SVG `d` string. On success stores a handle in `*outHandle` (free
