@@ -25,6 +25,7 @@ int main(void) {
   /* NULL-safety: benign returns, no crash. */
   uv_path_free(NULL);
   uv_prepared_path_free(NULL);
+  uv_mesh_free(NULL);
   uv_image_free(NULL);
   uv_color_free(NULL);
   uv_buffer_free(NULL, 0);
@@ -87,6 +88,18 @@ int main(void) {
   assert(stroked != NULL);
   assert(uv_path_command_count(stroked) > 0);
   uv_path_free(stroked);
+  uv_mesh mesh = uv_prepared_path_tessellate_fill(
+      prepared, UV_WINDING_NON_ZERO);
+  assert(mesh != NULL);
+  assert(uv_mesh_vertex_count(mesh) == 4);
+  assert(uv_mesh_index_count(mesh) == 6);
+  uv_vector_vertex mesh_vertex = {0};
+  assert(uv_mesh_vertex_get(mesh, 0, &mesh_vertex) == UV_OK);
+  assert(mesh_vertex.coverage == 1.0f);
+  uint32_t mesh_index = UINT32_MAX;
+  assert(uv_mesh_index_get(mesh, 0, &mesh_index) == UV_OK);
+  assert(mesh_index < uv_mesh_vertex_count(mesh));
+  uv_mesh_free(mesh);
   uv_prepared_path_free(prepared);
 
   uv_vec2 midpoint = {0};

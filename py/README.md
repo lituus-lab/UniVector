@@ -71,6 +71,8 @@ print(prepared.bounds)
 print(prepared.segments)  # immutable tuple snapshot
 outline = prepared.stroke(2, cap=univector.CAP_ROUND,
                           join=univector.JOIN_BEVEL)
+mesh = prepared.tessellate_fill(univector.WINDING_NON_ZERO)
+print(mesh.triangle_count, mesh.vertices, mesh.indices)
 ```
 
 The tolerance is the subdivision threshold used against each curve span. A
@@ -98,7 +100,9 @@ parameters.
   `elliptical_arc_to`, `arc`, `arc_to`, `rect`, `rounded_rect`, `ellipse`,
   `circle`, `polygon`, `close_path`, `add_path`, `copy`, `parse_d`, `to_d`,
   `to_svg`, `flatten`, `prepare`, `bounds`, `current`, `start`, and `commands`.
-- `PreparedPath`: `segments`, `bounds`, `tolerance`, `stroke`, and `len`.
+- `PreparedPath`: `segments`, `bounds`, `tolerance`, `stroke`,
+  `tessellate_fill`, and `len`.
+- `VectorMesh`: `vertices`, `indices`, and `triangle_count`.
 - `Image`: `width`, `height`, `channels`, `pixels`, `fill`, and `encode_png`.
 - `Color`: `parse`, `rgba`, and `to_svg`.
 - Geometry: `quad_point`, `cubic_point`, and `compute_bounds`.

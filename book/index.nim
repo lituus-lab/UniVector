@@ -151,6 +151,25 @@ Miter joins fall back to bevel joins when their length exceeds the configured
 miter limit. The result is a regular `Path`, so all existing fill, SVG, C, and
 Python operations remain applicable.
 
+## Tessellating fills for renderers
+
+The renderer-neutral mesh contains `Vector2f` positions, coverage values, and
+zero-based triangle indices. It owns no GPU device or command queue:
+"""
+
+nbCode:
+  var meshPath = newPath()
+  meshPath.rect(2, 2, 8, 6)
+  let mesh = meshPath.preparePath().tessellateFill()
+  doAssert mesh.triangleCount == 2
+  doAssert mesh.indexCount == 6
+  echo "mesh vertices = ", mesh.vertexCount
+
+nbText: """
+NonZero and EvenOdd winding are both supported, including nested contours.
+The immutable snapshots returned by Nim, C, and Python can be cached or copied
+directly into backend-owned buffers.
+
 ## Filling: crossings and winding
 
 For each sampled scanline, UniVector finds where path edges cross it and sorts

@@ -9,8 +9,8 @@
 ##     initialiser). Repeated calls are harmless; externally synchronise the
 ##     first call.
 ##   * Handles are opaque `void*`. The library owns them; free with the
-##     matching `uv_path_free` / `uv_prepared_path_free` / `uv_image_free` /
-##     `uv_color_free`. NULL is a no-op for every free.
+##     matching `uv_path_free` / `uv_prepared_path_free` / `uv_mesh_free` /
+##     `uv_image_free` / `uv_color_free`. NULL is a no-op for every free.
 ##   * `uv_path_to_d`, `uv_path_to_svg`, `uv_color_to_svg`, and
 ##     `uv_image_encode_png` allocate a C-owned buffer; free it with
 ##     `uv_buffer_free`. `uv_image_pixels` *borrows* the image buffer (valid
@@ -47,6 +47,9 @@ type
     x, y, w, h: float32
   UvSegment {.bycopy.} = object
     at, to: UvVec2
+  UvVectorVertex {.bycopy.} = object
+    position: UvVec2
+    coverage: float32
   UvPathCommand {.bycopy.} = object
     kind: cint
     params: array[7, float32]
@@ -54,6 +57,8 @@ type
     path: Path
   PreparedPathHandle = ref object
     path: PreparedPath
+  MeshHandle = ref object
+    mesh: VectorMesh
   ImgHandle = ref object
     img: uimg.Image[uint8]
   ColorHandle = ref object
@@ -64,6 +69,7 @@ proc NimMain() {.importc.}
 proc pathOf(p: pointer): PathHandle {.inline.} = cast[PathHandle](p)
 proc preparedPathOf(p: pointer): PreparedPathHandle {.inline.} =
   cast[PreparedPathHandle](p)
+proc meshOf(p: pointer): MeshHandle {.inline.} = cast[MeshHandle](p)
 proc imgOf(p: pointer): ImgHandle {.inline.} = cast[ImgHandle](p)
 proc colorOf(p: pointer): ColorHandle {.inline.} = cast[ColorHandle](p)
 
@@ -494,6 +500,60 @@ proc uv_prepared_path_stroke(h: pointer; width: float32; cap, join: cint;
     cast[pointer](path)
   except CatchableError, Defect:
     nil
+
+# -------------------------------- mesh --------------------------------------
+
+proc uv_prepared_path_tessellate_fill(h: pointer; winding: cint): pointer =
+  if h == nil or winding notin [UV_WINDING_NON_ZERO, UV_WINDING_EVEN_ODD]:
+    return nil
+  try:
+    let handle = MeshHandle(mesh: preparedPathOf(h).path.tessellateFill(
+        WindingRule(winding)))
+    GC_ref(handle)
+    cast[pointer](handle)
+  except CatchableError, Defect:
+    nil
+
+proc uv_mesh_vertex_count(h: pointer): csize_t =
+  if h == nil: return 0
+  try: csize_t(meshOf(h).mesh.vertexCount)
+  except CatchableError, Defect: 0
+
+proc uv_mesh_index_count(h: pointer): csize_t =
+  if h == nil: return 0
+  try: csize_t(meshOf(h).mesh.indexCount)
+  except CatchableError, Defect: 0
+
+proc uv_mesh_vertex_get(h: pointer; index: csize_t;
+    outVertex: ptr UvVectorVertex): cint =
+  if h == nil or outVertex == nil or index > csize_t(high(int)):
+    return UV_ERR_FORMAT
+  try:
+    let mesh = meshOf(h).mesh
+    if index >= csize_t(mesh.vertexCount): return UV_ERR_FORMAT
+    let vertex = mesh.vertex(int(index))
+    outVertex[] = UvVectorVertex(position: vertex.position.toC,
+        coverage: vertex.coverage)
+    UV_OK
+  except CatchableError, Defect:
+    UV_ERR_FORMAT
+
+proc uv_mesh_index_get(h: pointer; position: csize_t;
+    outIndex: ptr uint32): cint =
+  if h == nil or outIndex == nil or position > csize_t(high(int)):
+    return UV_ERR_FORMAT
+  try:
+    let mesh = meshOf(h).mesh
+    if position >= csize_t(mesh.indexCount): return UV_ERR_FORMAT
+    outIndex[] = mesh.index(int(position))
+    UV_OK
+  except CatchableError, Defect:
+    UV_ERR_FORMAT
+
+proc uv_mesh_free(h: pointer) =
+  if h == nil: return
+  swallowAbiFaults:
+    GC_unref(meshOf(h))
 
 proc uv_path_parse_d(s: cstring; outHandle: ptr pointer): cint =
   ## Parse an SVG `d` string. On success stores a handle in `*outHandle` (free
