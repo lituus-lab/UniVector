@@ -79,12 +79,12 @@ func geometryBounds(segments: seq[Segment]): Rect {.inline.} =
   segments.computeBounds()
 
 proc fillGeometry[Geometry](img: var uimg.Image[uint8]; geometry: Geometry;
-    color: Color; windingRule: WindingRule; blendMode: BlendMode) =
+    bounds: Rect; color: Color; windingRule: WindingRule;
+        blendMode: BlendMode) =
   if geometry.geometryLen == 0: return
   let
     width = img.width
     height = img.height
-    bounds = geometry.geometryBounds
     minY = bounds.y
     maxY = bounds.y + bounds.h
   if maxY < 0'f32 or minY > float32(height): return
@@ -164,7 +164,8 @@ proc fillPath*(img: var uimg.Image[uint8]; path: Path; color: Color;
     color.spaceTag != tagUnknown
   body:
     let segments = path.flatten(tol)
-    img.fillGeometry(segments, color, windingRule, blendMode)
+    let bounds = segments.geometryBounds
+    img.fillGeometry(segments, bounds, color, windingRule, blendMode)
 
 proc fillPreparedPath*(img: var uimg.Image[uint8]; path: PreparedPath;
                        color: Color; windingRule: WindingRule = NonZero;
@@ -175,4 +176,4 @@ proc fillPreparedPath*(img: var uimg.Image[uint8]; path: PreparedPath;
     color.spaceTag != tagUnknown
   body:
     let segments = path.segmentView
-    img.fillGeometry(segments, color, windingRule, blendMode)
+    img.fillGeometry(segments, path.bounds, color, windingRule, blendMode)
