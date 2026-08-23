@@ -29,6 +29,7 @@ solid fill in a minimal standalone SVG document. It is not a general SVG
 document reader or scene serializer: XML structure, multiple elements,
 transforms, strokes, gradients, text, clipping, masks, filters, animation, and
 external resources are outside the 1.0 surface.
+
 - Matching C and Python surfaces for the public Nim engine.
 
 ## Nim quickstart
