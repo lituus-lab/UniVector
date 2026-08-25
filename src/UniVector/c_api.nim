@@ -189,11 +189,53 @@ template swallowAbiFaults(body: untyped) =
   except CatchableError, Defect:
     discard
 
+
+# A shared library runs NimMain from DllMain (Windows) or an ELF constructor;
+# a static one has neither, so nothing initializes the Nim runtime. The first
+# entry point then enters Nim code whose globals were never set up and the
+# process faults. The static-library tasks pass -d:staticNoAutoInit; shared
+# builds must not, or NimMain runs twice.
+when defined(staticNoAutoInit):
+  # A once primitive, not a plain flag: two threads reaching an entry point
+  # together would both see the flag unset, both call NimMain, and the second
+  # would enter Nim code the first had not finished initializing. The platform
+  # primitives block the losers until the winner returns, which a flag cannot.
+  #
+  # C statics, not Nim globals: module initialization would reset a Nim one and
+  # NimMain would run again. NimMain is declared here too — the generated
+  # prototype comes after this section.
+  {.emit: """/*VARSECTION*/
+void NimMain(void);
+#ifdef _WIN32
+#  include <windows.h>
+static INIT_ONCE uv_runtime_once = INIT_ONCE_STATIC_INIT;
+static BOOL CALLBACK uv_runtime_init(PINIT_ONCE o, PVOID p, PVOID *c) {
+  (void)o; (void)p; (void)c; NimMain(); return TRUE;
+}
+static void uv_runtime_ensure(void) {
+  InitOnceExecuteOnce(&uv_runtime_once, uv_runtime_init, NULL, NULL);
+}
+#else
+#  include <pthread.h>
+static pthread_once_t uv_runtime_once = PTHREAD_ONCE_INIT;
+static void uv_runtime_init(void) { NimMain(); }
+static void uv_runtime_ensure(void) {
+  pthread_once(&uv_runtime_once, uv_runtime_init);
+}
+#endif
+""".}
+  template ensureRuntime() =
+    {.emit: "  uv_runtime_ensure();".}
+else:
+  template ensureRuntime() = discard
+
+
 {.push exportc, cdecl, dynlib.}
 
 proc uv_init() =
   ## Initialise the Nim runtime once. The first call must be externally
   ## synchronised; callers must invoke it before any other ABI function.
+  ensureRuntime()
   if runtimeInitialized: return
   try:
     NimMain()
@@ -201,9 +243,12 @@ proc uv_init() =
   except CatchableError, Defect:
     discard
 
-proc uv_abi_version(): cint = cint(UniVectorAbiVersion)
+proc uv_abi_version(): cint =
+  ensureRuntime()
+  cint(UniVectorAbiVersion)
 
 proc uv_strerror(code: cint): cstring =
+  ensureRuntime()
   case code
   of UV_OK: cstring"ok"
   of UV_ERR_FORMAT: cstring"bad argument / nil handle / unparseable path / bad color"
@@ -213,12 +258,14 @@ proc uv_strerror(code: cint): cstring =
 
 proc uv_version(): cstring =
   ## Static engine version string; do not free. Never raises.
+  ensureRuntime()
   cstring(UniVectorVersion)
 
 # ------------------------------- path ---------------------------------------
 
 proc uv_path_new(): pointer =
   ## An empty path. NULL only on allocation failure.
+  ensureRuntime()
   try:
     let h = PathHandle(path: newPath())
     GC_ref(h)
@@ -228,6 +275,7 @@ proc uv_path_new(): pointer =
 
 proc uv_path_copy(src: pointer): pointer =
   ## A deep copy of `src`. NULL on a nil src or allocation failure.
+  ensureRuntime()
   if src == nil: return nil
   try:
     let h = PathHandle(path: pathOf(src).path.copy())
@@ -237,6 +285,7 @@ proc uv_path_copy(src: pointer): pointer =
     nil
 
 proc uv_path_move_to(h: pointer; x, y: float32): cint =
+  ensureRuntime()
   if h == nil or not allFinite([x, y]): return UV_ERR_FORMAT
   try:
     pathOf(h).path.moveTo(x, y)
@@ -245,6 +294,7 @@ proc uv_path_move_to(h: pointer; x, y: float32): cint =
     UV_ERR_FORMAT
 
 proc uv_path_line_to(h: pointer; x, y: float32): cint =
+  ensureRuntime()
   if h == nil or not allFinite([x, y]): return UV_ERR_FORMAT
   try:
     pathOf(h).path.lineTo(x, y)
@@ -254,6 +304,7 @@ proc uv_path_line_to(h: pointer; x, y: float32): cint =
 
 proc uv_path_bezier_curve_to(h: pointer; x1, y1, x2, y2, x3,
     y3: float32): cint =
+  ensureRuntime()
   if h == nil or not allFinite([x1, y1, x2, y2, x3, y3]): return UV_ERR_FORMAT
   try:
     pathOf(h).path.bezierCurveTo(x1, y1, x2, y2, x3, y3)
@@ -262,6 +313,7 @@ proc uv_path_bezier_curve_to(h: pointer; x1, y1, x2, y2, x3,
     UV_ERR_FORMAT
 
 proc uv_path_quadratic_curve_to(h: pointer; x1, y1, x2, y2: float32): cint =
+  ensureRuntime()
   if h == nil or not allFinite([x1, y1, x2, y2]): return UV_ERR_FORMAT
   try:
     pathOf(h).path.quadraticCurveTo(x1, y1, x2, y2)
@@ -271,6 +323,7 @@ proc uv_path_quadratic_curve_to(h: pointer; x1, y1, x2, y2: float32): cint =
 
 proc uv_path_elliptical_arc_to(h: pointer; rx, ry, rotation: float32;
     largeArc, sweep: cint; x, y: float32): cint =
+  ensureRuntime()
   if h == nil or rx < 0'f32 or ry < 0'f32 or
       not allFinite([rx, ry, rotation, x, y]): return UV_ERR_FORMAT
   try:
@@ -280,6 +333,7 @@ proc uv_path_elliptical_arc_to(h: pointer; rx, ry, rotation: float32;
     UV_ERR_FORMAT
 
 proc uv_path_rect(h: pointer; x, y, w, hgt: float32; clockwise: cint): cint =
+  ensureRuntime()
   if h == nil or not allFinite([x, y, w, hgt]): return UV_ERR_FORMAT
   try:
     pathOf(h).path.rect(x, y, w, hgt, clockwise != 0)
@@ -289,6 +343,7 @@ proc uv_path_rect(h: pointer; x, y, w, hgt: float32; clockwise: cint): cint =
 
 proc uv_path_rounded_rect(h: pointer; x, y, w, hgt, nw, ne, se, sw: float32;
     clockwise: cint): cint =
+  ensureRuntime()
   if h == nil or not allFinite([x, y, w, hgt, nw, ne, se, sw]):
     return UV_ERR_FORMAT
   try:
@@ -298,6 +353,7 @@ proc uv_path_rounded_rect(h: pointer; x, y, w, hgt, nw, ne, se, sw: float32;
     UV_ERR_FORMAT
 
 proc uv_path_ellipse(h: pointer; cx, cy, rx, ry: float32): cint =
+  ensureRuntime()
   if h == nil or rx < 0'f32 or ry < 0'f32 or
       not allFinite([cx, cy, rx, ry]): return UV_ERR_FORMAT
   try:
@@ -307,6 +363,7 @@ proc uv_path_ellipse(h: pointer; cx, cy, rx, ry: float32): cint =
     UV_ERR_FORMAT
 
 proc uv_path_circle(h: pointer; cx, cy, r: float32): cint =
+  ensureRuntime()
   if h == nil or r < 0'f32 or not allFinite([cx, cy, r]): return UV_ERR_FORMAT
   try:
     pathOf(h).path.circle(cx, cy, r)
@@ -315,6 +372,7 @@ proc uv_path_circle(h: pointer; cx, cy, r: float32): cint =
     UV_ERR_FORMAT
 
 proc uv_path_polygon(h: pointer; x, y, size: float32; sides: cint): cint =
+  ensureRuntime()
   if h == nil or sides <= 2 or sides > cint(MaxPolygonSides) or
       not allFinite([x, y, size]): return UV_ERR_FORMAT
   try:
@@ -324,6 +382,7 @@ proc uv_path_polygon(h: pointer; x, y, size: float32; sides: cint): cint =
     UV_ERR_FORMAT
 
 proc uv_path_close_path(h: pointer): cint =
+  ensureRuntime()
   if h == nil: return UV_ERR_FORMAT
   try:
     pathOf(h).path.closePath()
@@ -332,6 +391,7 @@ proc uv_path_close_path(h: pointer): cint =
     UV_ERR_FORMAT
 
 proc uv_path_add_path(h: pointer; other: pointer): cint =
+  ensureRuntime()
   if h == nil or other == nil: return UV_ERR_FORMAT
   try:
     pathOf(h).path.addPath(pathOf(other).path)
@@ -341,6 +401,7 @@ proc uv_path_add_path(h: pointer; other: pointer): cint =
 
 proc uv_path_arc(h: pointer; x, y, radius, a0, a1: float32;
     counterclockwise: cint): cint =
+  ensureRuntime()
   if h == nil or radius < 0'f32 or not allFinite([x, y, radius, a0, a1]):
     return UV_ERR_FORMAT
   try:
@@ -350,6 +411,7 @@ proc uv_path_arc(h: pointer; x, y, radius, a0, a1: float32;
     UV_ERR_FORMAT
 
 proc uv_path_arc_to(h: pointer; x1, y1, x2, y2, radius: float32): cint =
+  ensureRuntime()
   if h == nil or radius < 0'f32 or not allFinite([x1, y1, x2, y2, radius]):
     return UV_ERR_FORMAT
   try:
@@ -359,6 +421,7 @@ proc uv_path_arc_to(h: pointer; x1, y1, x2, y2, radius: float32): cint =
     UV_ERR_FORMAT
 
 proc uv_path_current(h: pointer; outPoint: ptr UvVec2): cint =
+  ensureRuntime()
   if h == nil or outPoint == nil: return UV_ERR_FORMAT
   try:
     outPoint[] = pathOf(h).path.at.toC
@@ -366,6 +429,7 @@ proc uv_path_current(h: pointer; outPoint: ptr UvVec2): cint =
   except CatchableError, Defect: UV_ERR_FORMAT
 
 proc uv_path_start(h: pointer; outPoint: ptr UvVec2): cint =
+  ensureRuntime()
   if h == nil or outPoint == nil: return UV_ERR_FORMAT
   try:
     outPoint[] = pathOf(h).path.start.toC
@@ -373,12 +437,14 @@ proc uv_path_start(h: pointer; outPoint: ptr UvVec2): cint =
   except CatchableError, Defect: UV_ERR_FORMAT
 
 proc uv_path_command_count(h: pointer): csize_t =
+  ensureRuntime()
   if h == nil: return 0
   try: csize_t(pathOf(h).path.commands.len)
   except CatchableError, Defect: 0
 
 proc uv_path_command_get(h: pointer; index: csize_t;
     outCommand: ptr UvPathCommand): cint =
+  ensureRuntime()
   if h == nil or outCommand == nil: return UV_ERR_FORMAT
   try:
     if index > csize_t(high(int)) or int(index) >= pathOf(h).path.commands.len:
@@ -388,12 +454,14 @@ proc uv_path_command_get(h: pointer; index: csize_t;
   except CatchableError, Defect: UV_ERR_FORMAT
 
 proc uv_path_command_is_relative(kind: cint): cint =
+  ensureRuntime()
   try:
     if kind < 0 or kind > cint(high(PathCommandKind).ord): return -1
     cint(isRelative(PathCommandKind(kind)))
   except CatchableError, Defect: -1
 
 proc uv_path_command_parameter_count(kind: cint): cint =
+  ensureRuntime()
   try:
     if kind < 0 or kind > cint(high(PathCommandKind).ord): return -1
     cint(parameterCount(PathCommandKind(kind)))
@@ -401,6 +469,7 @@ proc uv_path_command_parameter_count(kind: cint): cint =
 
 proc uv_quad_point(p0, control, p1: UvVec2; t: float32;
     outPoint: ptr UvVec2): cint =
+  ensureRuntime()
   if outPoint == nil or t < 0'f32 or t > 1'f32 or
       not allFinite([p0.x, p0.y, control.x, control.y, p1.x, p1.y, t]):
     return UV_ERR_FORMAT
@@ -412,6 +481,7 @@ proc uv_quad_point(p0, control, p1: UvVec2; t: float32;
 
 proc uv_cubic_point(p0, control1, control2, p1: UvVec2; t: float32;
     outPoint: ptr UvVec2): cint =
+  ensureRuntime()
   if outPoint == nil or t < 0'f32 or t > 1'f32 or
       not allFinite([p0.x, p0.y, control1.x, control1.y, control2.x,
                      control2.y, p1.x, p1.y, t]):
@@ -425,6 +495,7 @@ proc uv_cubic_point(p0, control1, control2, p1: UvVec2; t: float32;
 
 proc uv_path_flatten(h: pointer; tol: float32; outSegments: ptr UvSegment;
     capacity: csize_t; outCount: ptr csize_t): cint =
+  ensureRuntime()
   if h == nil or outCount == nil: return UV_ERR_FORMAT
   outCount[] = 0
   if not allFinite([tol]): return UV_ERR_FORMAT
@@ -443,6 +514,7 @@ proc uv_path_flatten(h: pointer; tol: float32; outSegments: ptr UvSegment;
 
 proc uv_segments_bounds(segments: ptr UvSegment; count: csize_t;
     outBounds: ptr UvRect): cint =
+  ensureRuntime()
   if outBounds == nil or count > csize_t(high(int)): return UV_ERR_FORMAT
   if count > 0 and segments == nil: return UV_ERR_FORMAT
   try:
@@ -461,6 +533,7 @@ proc uv_segments_bounds(segments: ptr UvSegment; count: csize_t;
 # --------------------------- prepared path ---------------------------------
 
 proc uv_path_prepare(h: pointer; tol: float32): pointer =
+  ensureRuntime()
   if h == nil or not allFinite([tol]): return nil
   let effectiveTol = if tol > 0'f32: tol else: FlattenTolerance
   try:
@@ -471,6 +544,7 @@ proc uv_path_prepare(h: pointer; tol: float32): pointer =
     nil
 
 proc uv_prepared_path_segment_count(h: pointer): csize_t =
+  ensureRuntime()
   if h == nil: return 0
   try:
     csize_t(preparedPathOf(h).path.len)
@@ -479,6 +553,7 @@ proc uv_prepared_path_segment_count(h: pointer): csize_t =
 
 proc uv_prepared_path_segment_get(h: pointer; index: csize_t;
     outSegment: ptr UvSegment): cint =
+  ensureRuntime()
   if h == nil or outSegment == nil or index > csize_t(high(int)):
     return UV_ERR_FORMAT
   try:
@@ -490,6 +565,7 @@ proc uv_prepared_path_segment_get(h: pointer; index: csize_t;
     UV_ERR_FORMAT
 
 proc uv_prepared_path_bounds(h: pointer; outBounds: ptr UvRect): cint =
+  ensureRuntime()
   if h == nil or outBounds == nil: return UV_ERR_FORMAT
   try:
     outBounds[] = preparedPathOf(h).path.bounds.toC
@@ -498,6 +574,7 @@ proc uv_prepared_path_bounds(h: pointer; outBounds: ptr UvRect): cint =
     UV_ERR_FORMAT
 
 proc uv_prepared_path_tolerance(h: pointer): float32 =
+  ensureRuntime()
   if h == nil: return 0'f32
   try:
     preparedPathOf(h).path.tolerance
@@ -505,12 +582,14 @@ proc uv_prepared_path_tolerance(h: pointer): float32 =
     0'f32
 
 proc uv_prepared_path_free(h: pointer) =
+  ensureRuntime()
   if h == nil: return
   swallowAbiFaults:
     GC_unref(preparedPathOf(h))
 
 proc uv_prepared_path_stroke(h: pointer; width: float32; cap, join: cint;
     miterLimit: float32): pointer =
+  ensureRuntime()
   var style: StrokeStyle
   if h == nil or not toStrokeStyle(width, cap, join, miterLimit, style):
     return nil
@@ -524,6 +603,7 @@ proc uv_prepared_path_stroke(h: pointer; width: float32; cap, join: cint;
 proc uv_prepared_path_stroke_dashed(h: pointer; width: float32; cap, join: cint;
     miterLimit: float32; dashes: ptr float32; dashCount: csize_t;
     dashOffset: float32): pointer =
+  ensureRuntime()
   var style: StrokeStyle
   if h == nil or not toDashedStrokeStyle(width, cap, join, miterLimit,
       dashes, dashCount, dashOffset, style):
@@ -536,6 +616,7 @@ proc uv_prepared_path_stroke_dashed(h: pointer; width: float32; cap, join: cint;
     nil
 
 proc uv_marker_path(shape: cint; center: UvVec2; size: float32): pointer =
+  ensureRuntime()
   if not shape.isValidMarkerShape or
       not allFinite([center.x, center.y, size]) or size <= 0'f32:
     return nil
@@ -549,6 +630,7 @@ proc uv_marker_path(shape: cint; center: UvVec2; size: float32): pointer =
 
 proc uv_markers_path(shape: cint; points: ptr UvVec2; count: csize_t;
                      size: float32): pointer =
+  ensureRuntime()
   if not shape.isValidMarkerShape or count > csize_t(MaxMarkerCount) or
       (count > 0 and points == nil) or not allFinite([size]) or size <= 0'f32:
     return nil
@@ -565,6 +647,7 @@ proc uv_markers_path(shape: cint; points: ptr UvVec2; count: csize_t;
 
 proc uv_markers_path_sized(shape: cint; points: ptr UvVec2;
     sizes: ptr float32; count: csize_t): pointer =
+  ensureRuntime()
   if not shape.isValidMarkerShape or count > csize_t(MaxMarkerCount) or
       (count > 0 and (points == nil or sizes == nil)):
     return nil
@@ -588,6 +671,7 @@ proc uv_markers_path_sized(shape: cint; points: ptr UvVec2;
 # -------------------------------- mesh --------------------------------------
 
 proc uv_prepared_path_tessellate_fill(h: pointer; winding: cint): pointer =
+  ensureRuntime()
   if h == nil or winding notin [UV_WINDING_NON_ZERO, UV_WINDING_EVEN_ODD]:
     return nil
   try:
@@ -600,6 +684,7 @@ proc uv_prepared_path_tessellate_fill(h: pointer; winding: cint): pointer =
 
 proc uv_prepared_path_tessellate_stroke(h: pointer; width: float32;
     cap, join: cint; miterLimit: float32): pointer =
+  ensureRuntime()
   var style: StrokeStyle
   if h == nil or not toStrokeStyle(width, cap, join, miterLimit, style):
     return nil
@@ -614,6 +699,7 @@ proc uv_prepared_path_tessellate_stroke(h: pointer; width: float32;
 proc uv_prepared_path_tessellate_stroke_dashed(h: pointer; width: float32;
     cap, join: cint; miterLimit: float32; dashes: ptr float32;
     dashCount: csize_t; dashOffset: float32): pointer =
+  ensureRuntime()
   var style: StrokeStyle
   if h == nil or not toDashedStrokeStyle(width, cap, join, miterLimit,
       dashes, dashCount, dashOffset, style):
@@ -627,17 +713,20 @@ proc uv_prepared_path_tessellate_stroke_dashed(h: pointer; width: float32;
     nil
 
 proc uv_mesh_vertex_count(h: pointer): csize_t =
+  ensureRuntime()
   if h == nil: return 0
   try: csize_t(meshOf(h).mesh.vertexCount)
   except CatchableError, Defect: 0
 
 proc uv_mesh_index_count(h: pointer): csize_t =
+  ensureRuntime()
   if h == nil: return 0
   try: csize_t(meshOf(h).mesh.indexCount)
   except CatchableError, Defect: 0
 
 proc uv_mesh_vertex_get(h: pointer; index: csize_t;
     outVertex: ptr UvVectorVertex): cint =
+  ensureRuntime()
   if h == nil or outVertex == nil or index > csize_t(high(int)):
     return UV_ERR_FORMAT
   try:
@@ -652,6 +741,7 @@ proc uv_mesh_vertex_get(h: pointer; index: csize_t;
 
 proc uv_mesh_index_get(h: pointer; position: csize_t;
     outIndex: ptr uint32): cint =
+  ensureRuntime()
   if h == nil or outIndex == nil or position > csize_t(high(int)):
     return UV_ERR_FORMAT
   try:
@@ -663,6 +753,7 @@ proc uv_mesh_index_get(h: pointer; position: csize_t;
     UV_ERR_FORMAT
 
 proc uv_mesh_free(h: pointer) =
+  ensureRuntime()
   if h == nil: return
   swallowAbiFaults:
     GC_unref(meshOf(h))
@@ -670,6 +761,7 @@ proc uv_mesh_free(h: pointer) =
 proc uv_path_parse_d(s: cstring; outHandle: ptr pointer): cint =
   ## Parse an SVG `d` string. On success stores a handle in `*outHandle` (free
   ## with `uv_path_free`); on failure clears it and returns `UV_ERR_FORMAT`.
+  ensureRuntime()
   if outHandle == nil: return UV_ERR_FORMAT
   outHandle[] = nil
   if s == nil: return UV_ERR_FORMAT
@@ -685,6 +777,7 @@ proc uv_path_parse_d(s: cstring; outHandle: ptr pointer): cint =
 proc uv_path_to_d(h: pointer; outStr: ptr ptr char; outLen: ptr csize_t): cint =
   ## Serialise the path to an SVG `d` string (NUL-terminated; free with
   ## `uv_buffer_free`). `*outLen` is the string length.
+  ensureRuntime()
   if outStr == nil or outLen == nil: return UV_ERR_FORMAT
   outStr[] = nil
   outLen[] = 0
@@ -695,6 +788,7 @@ proc uv_path_to_d(h: pointer; outStr: ptr ptr char; outLen: ptr csize_t): cint =
     UV_ERR_FORMAT
 
 proc uv_path_free(h: pointer) =
+  ensureRuntime()
   if h == nil: return
   swallowAbiFaults: GC_unref(pathOf(h))
 
@@ -703,6 +797,7 @@ proc uv_path_free(h: pointer) =
 proc uv_image_new(width, height: cint): pointer =
   ## A zeroed (transparent) RGBA8 image. NULL on bad dimensions or allocation
   ## failure.
+  ensureRuntime()
   if width <= 0 or height <= 0: return nil
   try:
     let img = uimg.newImage[uint8](int(width), int(height), uimg.csRgba)
@@ -713,16 +808,19 @@ proc uv_image_new(width, height: cint): pointer =
     nil
 
 proc uv_image_width(h: pointer): cint =
+  ensureRuntime()
   if h == nil: return 0
   try: cint(imgOf(h).img.width)
   except CatchableError, Defect: 0
 
 proc uv_image_height(h: pointer): cint =
+  ensureRuntime()
   if h == nil: return 0
   try: cint(imgOf(h).img.height)
   except CatchableError, Defect: 0
 
 proc uv_image_channels(h: pointer): cint =
+  ensureRuntime()
   if h == nil: return 0
   try: cint(imgOf(h).img.channels)
   except CatchableError, Defect: 0
@@ -732,6 +830,7 @@ proc uv_image_pixels(h: pointer; outPtr: ptr ptr uint8;
   ## Borrow the pixel buffer (no copy). `*outPtr` is valid until `h` is freed;
   ## do NOT free it with `uv_buffer_free`. Empty image -> `*outPtr = NULL`,
   ## `*outLen = 0`, `UV_OK`.
+  ensureRuntime()
   if outPtr == nil or outLen == nil: return UV_ERR_FORMAT
   outPtr[] = nil
   outLen[] = 0
@@ -748,6 +847,7 @@ proc uv_image_encode_png(h: pointer; outData: ptr ptr uint8;
     outLen: ptr csize_t): cint =
   ## Encode the image as PNG. On success allocates `*outData` (free with
   ## `uv_buffer_free`) and sets `*outLen`.
+  ensureRuntime()
   if outData == nil or outLen == nil: return UV_ERR_FORMAT
   outData[] = nil
   outLen[] = 0
@@ -765,6 +865,7 @@ proc uv_image_encode_png(h: pointer; outData: ptr ptr uint8;
     UV_ERR_FORMAT
 
 proc uv_image_free(h: pointer) =
+  ensureRuntime()
   if h == nil: return
   swallowAbiFaults: GC_unref(imgOf(h))
 
@@ -773,6 +874,7 @@ proc uv_image_free(h: pointer) =
 proc uv_color_parse(s: cstring): pointer =
   ## Parse a CSS Color 4 string (hex/rgb/oklch/...). NULL on a nil string or
   ## unparseable input. Never raises (parseColor returns a Result).
+  ensureRuntime()
   if s == nil: return nil
   try:
     let r = parseColor($s)
@@ -786,6 +888,7 @@ proc uv_color_parse(s: cstring): pointer =
 proc uv_color_rgba(r, g, b, a: float32): pointer =
   ## An sRGB color from straight-alpha floats in [0, 1]. NULL on an
   ## out-of-gamut / non-finite input.
+  ensureRuntime()
   if not allFinite([r, g, b, a]) or
       r < 0'f32 or r > 1'f32 or g < 0'f32 or g > 1'f32 or
       b < 0'f32 or b > 1'f32 or a < 0'f32 or a > 1'f32:
@@ -800,6 +903,7 @@ proc uv_color_rgba(r, g, b, a: float32): pointer =
     nil
 
 proc uv_color_free(h: pointer) =
+  ensureRuntime()
   if h == nil: return
   swallowAbiFaults: GC_unref(colorOf(h))
 
@@ -810,6 +914,7 @@ proc uv_fill_path(img: pointer; path: pointer; color: pointer;
   ## Solid-fill `path` with `color` onto `img` (RGBA8 straight alpha). `winding`
   ## is `UV_WINDING_*`, `blend` is `UV_BLEND_*`, and `tol <= 0` uses the
   ## default flattening tolerance.
+  ensureRuntime()
   if img == nil or path == nil or color == nil: return UV_ERR_FORMAT
   if not allFinite([tol]): return UV_ERR_FORMAT
   if winding != UV_WINDING_NON_ZERO and winding != UV_WINDING_EVEN_ODD:
@@ -827,6 +932,7 @@ proc uv_fill_path(img: pointer; path: pointer; color: pointer;
 
 proc uv_fill_prepared_path(img: pointer; path: pointer; color: pointer;
     winding, blend: cint): cint =
+  ensureRuntime()
   if img == nil or path == nil or color == nil or
       winding notin [UV_WINDING_NON_ZERO, UV_WINDING_EVEN_ODD] or
       blend < cint(low(BlendMode).ord) or blend > cint(high(BlendMode).ord):
@@ -844,6 +950,7 @@ proc uv_path_to_svg(path: pointer; color: pointer; width, height: cint;
     outStr: ptr ptr char; outLen: ptr csize_t): cint =
   ## Wrap the path's `d` string in an `<svg>` document with the given `color`
   ## and canvas size (NUL-terminated; free with `uv_buffer_free`).
+  ensureRuntime()
   if outStr == nil or outLen == nil: return UV_ERR_FORMAT
   outStr[] = nil
   outLen[] = 0
@@ -860,6 +967,7 @@ proc uv_color_to_svg(color: pointer; outStr: ptr ptr char;
     outLen: ptr csize_t): cint =
   ## The SVG color string for `color` (`#rrggbb[aa]`; NUL-terminated; free with
   ## `uv_buffer_free`).
+  ensureRuntime()
   if outStr == nil or outLen == nil: return UV_ERR_FORMAT
   outStr[] = nil
   outLen[] = 0
@@ -876,6 +984,7 @@ proc uv_buffer_free(p: pointer; len: csize_t) =
   ## `uv_color_to_svg` / `uv_image_encode_png`. NULL is a no-op. `len` is
   ## ignored (kept for symmetry with the allocator). Do NOT use on
   ## `uv_image_pixels`.
+  ensureRuntime()
   if p == nil: return
   swallowAbiFaults: deallocShared(p)
 

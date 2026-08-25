@@ -88,7 +88,7 @@ task clib, "C shared library":
        " src/UniVector/c_api.nim"
 
 task clibStatic, "C static library":
-  exec "nim c --app:staticlib --noMain --mm:arc -d:release -o:" & staticLib &
+  exec "nim c --app:staticlib -d:staticNoAutoInit --noMain --mm:arc -d:release -o:" & staticLib &
        " src/UniVector/c_api.nim"
 
 task clibMsvc, "C static library, MSVC ABI (Windows Python extension)":
@@ -97,7 +97,7 @@ task clibMsvc, "C static library, MSVC ABI (Windows Python extension)":
   # output is `UniVector.lib` — the intentional exception to the sharedLib /
   # staticLib naming. setup.py's Windows branch matches: `LIB_NAME =
   # "UniVector.lib"` and `libraries=["UniVector"]`.
-  exec "nim c --cc:vcc --app:staticlib --noMain --mm:arc -d:release" &
+  exec "nim c --cc:vcc --app:staticlib -d:staticNoAutoInit --noMain --mm:arc -d:release" &
        " -o:UniVector.lib src/UniVector/c_api.nim"
 
 # Nim's MinGW toolchain names it mingw32-make.
