@@ -2,7 +2,7 @@
 # Copyright 2026 lituus-lab
 # UniVector — vector-graphics engine for the lituus-lab Uni* family.
 
-version       = "1.0.0"
+version       = "1.1.0"
 author        = "lituus-lab"
 description   = "Extensible vector-graphics engine for the lituus-lab Uni* family (Nim + C-ABI + Python)"
 license       = "Apache-2.0"
@@ -14,28 +14,80 @@ requires "https://github.com/lituus-lab/UniLinalg#main"
 requires "https://github.com/lituus-lab/UniColor#main"
 requires "https://github.com/lituus-lab/UniImage#main"
 
+# nimble 0.22 exits 0 even when an `exec` inside a task fails, so a task's exit
+# code says nothing about whether its body ran. Each task writes a marker as
+# its last statement; `tools/gate.nim` removes the marker, runs the task, and
+# fails if it is not there afterwards. `nimble canary` proves the gate still
+# bites -- if that one ever passes, every other green result is worthless.
+const gateExe =
+  when defined(windows): "build/unigate.exe" else: "build/unigate"
+
+template done(task: string) =
+  mkDir "build/.gate"
+  writeFile("build/.gate/" & task & ".ok", "")
+
+proc gate(task: string): string =
+  ## `exec gate("test")` -- builds the tool on first use.
+  if not fileExists(gateExe):
+    exec "nim c --hints:off -o:" & gateExe & " tools/gate.nim"
+  gateExe & " " & task
+
+task canary, "Must fail: proves the gate still catches a broken build":
+  # No `done` here on purpose: the exec below raises, so the marker is never
+  # written and the gate reports the failure nimble swallowed.
+  exec "nim c -r --hints:off --path:src -o:build/canary tests/canary_broken.nim"
+
 task lint, "Fail if nimpretty would reformat a source":
   exec "nim c -r --hints:off -o:build/lint_tool tools/lint.nim"
+  done "lint"
 
 task checkVGraph, "Fail on an import that climbs the layers in vgraph.cfg":
   exec "nim c -r --hints:off -o:build/vgraph_tool tools/vgraph.nim"
+  done "checkVGraph"
 
-task docsDeps, "Install the docs toolchain (nimib)":
-  exec "nimble install -y nimib"
+const bookDeps = [
+  "https://github.com/pietroppeter/nimib#v0.4.1",
+  "https://github.com/pietroppeter/nimibook#v0.4.0",
+  "https://github.com/lituus-lab/lituus-theme#v0.2.0",
+]
+taskRequires "docsDeps", bookDeps[0], bookDeps[1], bookDeps[2]
+taskRequires "book", bookDeps[0], bookDeps[1], bookDeps[2]
+taskRequires "docs", bookDeps[0], bookDeps[1], bookDeps[2]
 
-task book, "Build the nimib book (needs nimib)":
-  # nimib compiles and runs the book's code blocks: a drift fails the build.
-  exec "nim c -r --path:src --hints:off -o:build/book book/index.nim"
+task docsDeps, "Install the docs toolchain (nimib + nimibook + theme)":
+  echo "nimib, nimibook and lituus-theme installed."
+  done "docsDeps"
+
+task bookInit, "Scaffold a chapter added to the table of contents":
+  withDir "book":
+    exec "nim c -r --hints:off -o:../build/nbook nbook.nim init"
+  done "bookInit"
+
+task book, "Build the multi-chapter book (needs nimib + nimibook)":
+  withDir "book":
+    exec "nim c -r --hints:off -o:../build/nbook nbook.nim clean"
+    # `init` before `build`, on every run: it is what creates `__site/assets`,
+    # which is not tracked, so a fresh clone has none and every page ships
+    # referencing a stylesheet and a script that are not there.
+    exec "nim c -r --hints:off -o:../build/nbook nbook.nim init"
+    exec "nim c -r --hints:off -o:../build/nbook nbook.nim build"
+  done "book"
 
 task docs, "API reference + book into pages/ — what CI publishes":
   rmDir "pages"
+  exec gate("book")
+  cpDir "book/__site", "pages"
+  rmFile "pages/book.json"
   exec "nim doc --index:on --outdir:pages/api --project --hints:off src/UniVector.nim"
-  exec "nimble book"
-  # The book is the landing page; the generated reference sits under api/.
-  cpFile "book/index.html", "pages/index.html"
+  # ...and the reference wears the same theme. `nim doc` has no stylesheet
+  # option, so the palette is appended to the one it just wrote.
+  exec "nim c -r --hints:off --outdir:build tools/theme_api.nim " &
+       "pages/api/nimdoc.out.css"
+  done "docs"
 
 task test, "Nim tests (debug, contracts active)":
   exec "nim c -r --path:src -o:build/test_version tests/test_version.nim"
+  exec "nim c -r --path:src -o:build/test_types tests/test_types.nim"
   exec "nim c -r --path:src -o:build/test_path tests/test_path.nim"
   exec "nim c -r --path:src -o:build/test_flatten tests/test_flatten.nim"
   exec "nim c -r --path:src -o:build/test_prepared tests/test_prepared.nim"
@@ -44,9 +96,11 @@ task test, "Nim tests (debug, contracts active)":
   exec "nim c -r --path:src -o:build/test_mesh tests/test_mesh.nim"
   exec "nim c -r --path:src -o:build/test_raster tests/test_raster.nim"
   exec "nim c -r --path:src -o:build/test_svg tests/test_svg.nim"
+  done "test"
 
 task testRelease, "Nim tests (release, contracts compiled away)":
   exec "nim c -r -d:release --path:src -o:build/test_version_rel tests/test_version.nim"
+  exec "nim c -r -d:release --path:src -o:build/test_types_rel tests/test_types.nim"
   exec "nim c -r -d:release --path:src -o:build/test_path_rel tests/test_path.nim"
   exec "nim c -r -d:release --path:src -o:build/test_flatten_rel tests/test_flatten.nim"
   exec "nim c -r -d:release --path:src -o:build/test_prepared_rel tests/test_prepared.nim"
@@ -55,20 +109,25 @@ task testRelease, "Nim tests (release, contracts compiled away)":
   exec "nim c -r -d:release --path:src -o:build/test_mesh_rel tests/test_mesh.nim"
   exec "nim c -r -d:release --path:src -o:build/test_raster_rel tests/test_raster.nim"
   exec "nim c -r -d:release --path:src -o:build/test_svg_rel tests/test_svg.nim"
+  done "testRelease"
 
 task testCi, "Nim tests (CI subset, debug)":
-  exec "nimble test"
+  exec gate("test")
+  done "testCi"
 
 task testCiRelease, "Nim tests (CI subset, release)":
-  exec "nimble testRelease"
+  exec gate("testRelease")
+  done "testCiRelease"
 
 task testAll, "debug + release + C ABI":
-  exec "nimble test"
-  exec "nimble testRelease"
-  exec "nimble ctest"
+  exec gate("test")
+  exec gate("testRelease")
+  exec gate("ctest")
+  done "testAll"
 
 task univector, "Build the univector CLI (render to PNG + SVG)":
   exec "nim c --path:src -o:bin/univector bin/univector_cli.nim"
+  done "univector"
 
 # Nim takes `-o:` literally and appends no platform extension.
 const
@@ -86,10 +145,12 @@ const
 task clib, "C shared library":
   exec "nim c --app:lib --noMain --mm:arc -d:release -o:" & sharedLib & macArgs &
        " src/UniVector/c_api.nim"
+  done "clib"
 
 task clibStatic, "C static library":
   exec "nim c --app:staticlib -d:staticNoAutoInit --noMain --mm:arc -d:release -o:" & staticLib &
        " src/UniVector/c_api.nim"
+  done "clibStatic"
 
 task clibMsvc, "C static library, MSVC ABI (Windows Python extension)":
   # CPython on Windows is MSVC-built and cannot link MinGW output. MSVC's
@@ -99,6 +160,7 @@ task clibMsvc, "C static library, MSVC ABI (Windows Python extension)":
   # "UniVector.lib"` and `libraries=["UniVector"]`.
   exec "nim c --cc:vcc --app:staticlib -d:staticNoAutoInit --noMain --mm:arc -d:release" &
        " -o:UniVector.lib src/UniVector/c_api.nim"
+  done "clibMsvc"
 
 # Nim's MinGW toolchain names it mingw32-make.
 let makeExe = if findExe("mingw32-make").len > 0: "mingw32-make" else: "make"
@@ -106,18 +168,22 @@ let pythonExe = if defined(windows): "python" else: "python3"
 
 # `make -C`, not `cd dir && make`: nimble's exec runs no shell on Windows.
 task ctest, "C ABI tests":
-  exec "nimble clibStatic"
+  exec gate("clibStatic")
   exec makeExe & " -C tests/c"
+  done "ctest"
 
 task example, "Nim demo (print-only; no file I/O)":
   exec "nim c -r --path:src -o:build/demo examples/demo.nim"
+  done "example"
 
 task bench, "Deterministic local parse, flatten, and raster benchmark":
   exec "nim c -r -d:release --path:src -o:build/bench bench/bench_univector.nim"
+  done "bench"
 
 task cexample, "C demo (print-only consumer of the uv_* ABI)":
-  exec "nimble clibStatic"
+  exec gate("clibStatic")
   exec makeExe & " -C examples/c"
+  done "cexample"
 
 task pyDeps, "Install Python build deps (setuptools, Cython, pytest) if missing":
   let pipHelp = gorgeEx(pythonExe & " -m pip install --help").output
@@ -126,41 +192,47 @@ task pyDeps, "Install Python build deps (setuptools, Cython, pytest) if missing"
     else: ""
   exec pythonExe & " -m pip install" & systemFlag &
        " --quiet setuptools wheel \"Cython>=3.0.0\" pytest"
+  done "pyDeps"
 
 # The extension links the vcc static lib on Windows, the shared lib elsewhere.
 task pyLib, "Build the library the Python extension links against":
   when defined(windows):
-    exec "nimble clibMsvc"
+    exec gate("clibMsvc")
   else:
-    exec "nimble clib"
+    exec gate("clib")
+  done "pyLib"
 
 task buildCython, "Cython extension in-place":
-  exec "nimble pyLib"
-  exec "nimble pyDeps"
+  exec gate("pyLib")
+  exec gate("pyDeps")
   # nimscript `cd` (lib/system/nimscript.nim) changes the VM cwd for the next
   # exec without a shell, so the task works under nimble's no-shell exec on Windows.
   cd "py"
   exec pythonExe & " setup.py build_ext --inplace"
   cd ".."
+  done "buildCython"
 
 task pyTest, "Cython extension + pytest":
-  exec "nimble buildCython"
+  exec gate("buildCython")
   cd "py"
   exec pythonExe & " -m pytest -q"
   cd ".."
+  done "pyTest"
 
 task pyWheel, "wheel":
-  exec "nimble pyLib"
-  exec "nimble pyDeps"
+  exec gate("pyLib")
+  exec gate("pyDeps")
   cd "py"
   exec pythonExe & " setup.py bdist_wheel"
   cd ".."
+  done "pyWheel"
 
 task pySdist, "Python source distribution with vendored Nim source":
-  exec "nimble pyDeps"
+  exec gate("pyDeps")
   cd "py"
   exec pythonExe & " setup.py sdist"
   cd ".."
+  done "pySdist"
 
 task coverage, "LCOV + HTML coverage report for the Nim sources (needs lcov)":
   # gcov and lcov driven directly, no coco. Linux and macOS only.
@@ -185,3 +257,4 @@ task coverage, "LCOV + HTML coverage report for the Nim sources (needs lcov)":
   exec "genhtml lcov.info --output-directory coverage --legend --quiet" &
        " --ignore-errors range,range"
   exec "lcov --summary lcov.info"
+  done "coverage"

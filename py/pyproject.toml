@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "univector"
-version = "1.0.0"
+version = "1.1.0"
 description = "Python binding for the extensible UniVector vector-graphics engine"
 readme = "README.md"
 requires-python = ">=3.10"

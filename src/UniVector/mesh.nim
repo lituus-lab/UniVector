@@ -27,22 +27,31 @@ func indexCount*(mesh: VectorMesh): int {.inline.} = mesh.indicesData.len
 func triangleCount*(mesh: VectorMesh): int {.inline.} = mesh.indexCount div 3
 
 proc vertex*(mesh: VectorMesh; index: int): VectorVertex {.contractual, inline.} =
+  ## One vertex, by position. The index is a precondition rather than a
+  ## runtime check, so it compiles away in release: a caller iterating up to
+  ## `vertexCount` cannot be out of range, and one that is has a bug the
+  ## contract names in a debug build.
   require:
     index >= 0 and index < mesh.vertexCount
   body:
     mesh.verticesData[index]
 
 proc index*(mesh: VectorMesh; position: int): uint32 {.contractual, inline.} =
+  ## One index from the triangle list, by position. Indices come in threes;
+  ## `triangleCount` is the count that respects that, `indexCount` is not.
   require:
     position >= 0 and position < mesh.indexCount
   body:
     mesh.indicesData[position]
 
 proc vertices*(mesh: VectorMesh): seq[VectorVertex] =
+  ## Every vertex, copied. A copy and not a view: the mesh owns its storage
+  ## and outlives no caller. Use `vertex` in a loop to avoid the allocation.
   result = newSeq[VectorVertex](mesh.vertexCount)
   for i in 0 ..< result.len: result[i] = mesh.verticesData[i]
 
 proc indices*(mesh: VectorMesh): seq[uint32] =
+  ## Every index, copied, for the same reason as `vertices`.
   result = newSeq[uint32](mesh.indexCount)
   for i in 0 ..< result.len: result[i] = mesh.indicesData[i]
 

@@ -27,4 +27,4 @@ export mesh
 export raster
 export svg
 
-const UniVectorVersion* = "1.0.0"
+const UniVectorVersion* = "1.1.0"

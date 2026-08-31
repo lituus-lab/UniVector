@@ -11,8 +11,8 @@ def test_abi_version():
 
 
 def test_version():
-    assert univector.version() == "1.0.0"
-    assert univector.__version__ == "1.0.0"
+    assert univector.version() == "1.1.0"
+    assert univector.__version__ == "1.1.0"
 
 
 def test_strerror_ok():

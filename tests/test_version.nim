@@ -1,28 +1,65 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 lituus-lab
-import std/unittest
+## The version, stated in five places, checked to agree.
+##
+## Nimble refuses anything but a string literal for `version`, so the manifest
+## cannot import a shared constant and no arrangement makes one file the source
+## the others derive from. What is achievable is proof: this test reads every
+## copy and fails when one drifts, which is what a release needs before it can
+## claim manifest = header = wheel = tag.
+import std/[unittest, os, strutils]
 import UniVector
 
-suite "version":
-  test "UniVectorVersion is 1.0.0":
-    check UniVectorVersion == "1.0.0"
+const Root = currentSourcePath().parentDir.parentDir
 
-suite "leaf types":
-  test "Vec2 aliases UniLinalg Vector2f":
-    var p: Vec2 = vec2(1.float32, 2.float32)
-    check p.x == 1.float32
-    check p.y == 2.float32
-    check p.lengthSquared() == 5.float32
+proc valueOf(path, key, opener, closer: string): string =
+  ## The first `key … opener VALUE closer` on one line of the file; an empty
+  ## `closer` reads to the end of the line. Deliberately crude: a parser per
+  ## format would be more code than the thing it checks.
+  for line in readFile(Root / path).splitLines:
+    let at = line.find(key)
+    if at < 0: continue
+    let opens = line.find(opener, at + key.len)
+    if opens < 0: continue
+    let value = line[opens + opener.len .. ^1]
+    if closer.len == 0: return value.strip
+    let closes = value.find(closer)
+    if closes < 0: continue
+    return value[0 ..< closes]
+  ""
 
-  test "Rect holds origin + size (flat x/y/w/h)":
-    let r = Rect(x: 0, y: 0, w: 3, h: 4)
-    check r.w == 3.float32
-    check r.h == 4.float32
+suite "one version, five copies":
+  let manifest = valueOf("UniVector.nimble", "version", "\"", "\"")
 
-  test "Segment is two Vec2s (at/to)":
-    let s = Segment(at: vec2(0.float32, 0.float32), to: vec2(1.float32, 1.float32))
-    check s.to.x == 1.float32
-    check s.to.y == 1.float32
+  test "the manifest states one":
+    check manifest.len > 0
+    check manifest.count('.') == 2
 
-  test "winding rules distinct":
-    check NonZero.int != EvenOdd.int
+  test "the Nim constant agrees":
+    check UniVectorVersion == manifest
+
+  test "the C header agrees, macros and string alike":
+    let parts = manifest.split('.')
+    check valueOf("include/UniVector.h", "UNIVECTOR_VERSION_MAJOR", " ",
+        "") == parts[0]
+    check valueOf("include/UniVector.h", "UNIVECTOR_VERSION_MINOR", " ",
+        "") == parts[1]
+    check valueOf("include/UniVector.h", "UNIVECTOR_VERSION_PATCH", " ",
+        "") == parts[2]
+    check valueOf("include/UniVector.h", "define UNIVECTOR_VERSION ", "\"",
+        "\"") == manifest
+
+  test "the C ABI has no copy of its own":
+    # It returns the Nim constant directly rather than restating the string,
+    # so there is one fewer place to drift. This fails if someone inlines a
+    # literal there, which is the only way that could change.
+    let source = readFile(Root / "src/UniVector/c_api.nim")
+    check "cstring(UniVectorVersion)" in source
+    check ("\"" & manifest & "\"") notin source
+
+  test "the Python distribution agrees":
+    check valueOf("py/pyproject.toml", "version", "\"", "\"") == manifest
+
+  test "the Python test expects it":
+    check valueOf("py/tests/test_univector.py", "univector.version()", "\"",
+        "\"") == manifest

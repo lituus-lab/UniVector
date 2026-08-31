@@ -60,3 +60,9 @@ py/.pytest_cache/
 
 *.log
 *.core
+
+# nimib saves a page beside a compiled chapter; not a deliverable.
+book/*.html
+
+# nimibook build output. `docs` copies it to pages/, which is what ships.
+book/__site/
