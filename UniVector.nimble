@@ -191,7 +191,7 @@ task pyDeps, "Install Python build deps (setuptools, Cython, pytest) if missing"
     if pipHelp.contains("--break-system-packages"): " --break-system-packages"
     else: ""
   exec pythonExe & " -m pip install" & systemFlag &
-       " --quiet setuptools wheel \"Cython>=3.0.0\" pytest"
+       " --quiet --upgrade \"setuptools>=77\" wheel \"Cython>=3.0.0\" pytest"
   done "pyDeps"
 
 # The extension links the vcc static lib on Windows, the shared lib elsewhere.
@@ -252,9 +252,12 @@ task coverage, "LCOV + HTML coverage report for the Nim sources (needs lcov)":
        " -o:build/test_coverage tests/test_coverage.nim"
   exec "./build/test_coverage"
   exec "lcov --capture --directory " & cache & " --base-directory ." &
-       " --include \"*/src/UniVector/*\" --output-file lcov.info --quiet" &
+       " --include \"*/src/UniVector/*\" --output-file lcov.info --quiet --ignore-errors mismatch" &
        " --ignore-errors gcov,gcov"
-  exec "genhtml lcov.info --output-directory coverage --legend --quiet" &
-       " --ignore-errors range,range"
+  # gcov can attribute a final generated expression to EOF + 1; `range` is
+  # genhtml's documented filter for precisely that compiler artifact, and
+  # lcov 2.x wants the matching category allowance before it applies it.
+  exec "genhtml lcov.info --filter range --ignore-errors range" &
+       " --output-directory coverage --legend --quiet"
   exec "lcov --summary lcov.info"
   done "coverage"

@@ -14,11 +14,10 @@ CFLAGS := -I$(ROOT)/include -O2 -Wall -Wextra -std=c11
 LIB    := $(ROOT)/libUniVector.a
 # uv_image_encode_png pulls UniImage's PNG/DEFLATE codecs (libz FFI), so a C
 # consumer must supply libz itself — same as tests/c/Makefile.
-ifeq ($(OS),Windows_NT)
-  LIBS := -lz
-else
-  LIBS := -lz
-endif
+# libm too: the engine's mathematics calls pow, atan2 and friends. glibc keeps
+# them out of libc, so the link fails on Linux while macOS never noticed.
+# Keep system libraries after the archive so one-pass Unix linkers resolve them.
+LIBS := -lz -lm
 
 ifeq ($(OS),Windows_NT)
   BIN  := demo.exe
