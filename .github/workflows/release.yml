@@ -171,7 +171,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/univector/
+      url: https://pypi.org/project/lituus-univector/
     permissions:
       id-token: write
     steps:

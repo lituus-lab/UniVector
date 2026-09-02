@@ -14,7 +14,7 @@ styles, transforms, strokes, gradients, text, or external resources.
 ## Install
 
 ```bash
-python -m pip install univector
+python -m pip install lituus-univector
 ```
 
 Wheels are built for CPython 3.10–3.14 on Linux, macOS, and Windows. A source
