@@ -34,6 +34,10 @@ tools. Coverage needs `lcov` and `genhtml`.
 - C callers invoke `uv_init()` exactly once before any other ABI function.
   Handles are opaque and library-owned. Allocated ABI buffers use
   `uv_buffer_free`; `uv_image_pixels` is borrowed.
+- A change to `c_api.nim` is verified by `ctest`, `pyTest` and, where there
+  is one, `wasmTest`: three linkages, three runtime bootstraps. A green
+  `ctest` alone proved nothing the day the shared build lost its
+  initializer and every registry answered with the sentinel.
 - ABI builds use `-d:release`, never `-d:danger`, and catch both
   `CatchableError` and `Defect` at the foreign boundary.
 
