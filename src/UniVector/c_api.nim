@@ -38,8 +38,6 @@ when defined(danger):
 const UniVectorAbiVersion = 1
 const MaxPolygonSides = MaxFlattenSegments
 
-var runtimeInitialized = false
-
 type
   UvVec2 {.bycopy.} = object
     x, y: float32
@@ -235,13 +233,14 @@ else:
 proc uv_init() =
   ## Initialise the Nim runtime once. The first call must be externally
   ## synchronised; callers must invoke it before any other ABI function.
+  ##
+  ## The work is `ensureRuntime`, which every entry point calls. It used to be
+  ## followed by a direct NimMain, so under -d:staticNoAutoInit the module
+  ## initializers ran twice, rebuilding every global while the first set was
+  ## still live -- and the flag meant to prevent it was itself a Nim global,
+  ## which that second run reset. Reproduced in UniColor: the second
+  ## `uc_palette_make` of a process died inside Nim's allocator.
   ensureRuntime()
-  if runtimeInitialized: return
-  try:
-    NimMain()
-    runtimeInitialized = true
-  except CatchableError, Defect:
-    discard
 
 proc uv_abi_version(): cint =
   ensureRuntime()
