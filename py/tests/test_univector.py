@@ -241,3 +241,14 @@ def test_path_builders_reject_invalid_domains():
         p.ellipse(0, 0, -1, 2)
     with pytest.raises(ValueError):
         p.circle(0, 0, -1)
+
+
+def test_color_has_no_public_constructor():
+    # PreparedPath and VectorMesh already refuse this; Color used to accept any
+    # arguments and hand back a nil handle, so the mistake surfaced later as a
+    # generic "bad argument" from whatever consumed the color.
+    for args in [(), (255, 128, 0), (255, 128, 0, 255), ("red",)]:
+        with pytest.raises(TypeError):
+            univector.Color(*args)
+    assert univector.Color.rgba(1.0, 0.5, 0.0).to_svg() == "#FF8000"
+    assert univector.Color.parse("#ff8800").to_svg() == "#FF8800"
